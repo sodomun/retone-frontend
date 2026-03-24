@@ -1,7 +1,28 @@
-/*
-円形プロフィール画像です。 
-アイコン表示を毎回同じように使いたいので、小さく切ると便利です。
-使う場所は、 
-友達一覧
-相手メッセージの横
-*/
+type Props = {
+  displayName: string;
+  size?: number;
+};
+
+export default function ProfileAvatar({ displayName, size = 40 }: Props) {
+  const initial = displayName.charAt(0).toUpperCase();
+
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        backgroundColor: "#ccc",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: size * 0.45,
+        fontWeight: "bold",
+        color: "#fff",
+        flexShrink: 0,
+      }}
+    >
+      {initial}
+    </div>
+  );
+}

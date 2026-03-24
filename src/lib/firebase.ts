@@ -1,10 +1,7 @@
 // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore/lite";
-import { getAuth } from "firebase/auth";
-import { GoogleAuthProvider } from "firebase/auth/web-extension";
-import { exp } from "firebase/firestore/pipelines";
+import { initializeApp, getApps } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -12,18 +9,17 @@ import { exp } from "firebase/firestore/pipelines";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-    apiKey: "AIzaSyAkEIkCPX-5dxyG3IUePv5yuv_5zTT7hZY",
-    authDomain: "retone-message-app.firebaseapp.com",
-    projectId: "retone-message-app",
-    storageBucket: "retone-message-app.firebasestorage.app",
-    messagingSenderId: "455664691448",
-    appId: "1:455664691448:web:d8ad85215d9456f681330d",
-    measurementId: "G-GKYZQ3NRTN"
+    apiKey: "AIzaSyA4pOZqWrcu0FLWD3x7hu7-XoKl9sHi_Tw",
+    authDomain: "retone-chat-app.firebaseapp.com",
+    projectId: "retone-chat-app",
+    storageBucket: "retone-chat-app.firebasestorage.app",
+    messagingSenderId: "890542908922",
+    appId: "1:890542908922:web:e6bff0bc1a799ada563043",
+    measurementId: "G-STW2B96W6B"
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();

@@ -26,7 +26,6 @@ export default function SignupPage() {
         createdAt: Timestamp.now(),
       });
 
-      document.cookie = "auth_session=1; path=/";
       router.push("/talk");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "サインアップに失敗しました");

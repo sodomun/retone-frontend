@@ -16,7 +16,6 @@ export default function LoginPage() {
     setError("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      document.cookie = "auth_session=1; path=/";
       router.push("/talk");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");

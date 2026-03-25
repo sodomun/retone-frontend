@@ -32,13 +32,13 @@ export async function addFriend(
   const now = serverTimestamp();
 
   await Promise.all([
-    // 自分 → 相手
+    // 自分 → 相手. 自分のdb中の, users/{currentUid}/friends/{friendUid}{...}を書き込んでいる.
     setDoc(doc(db, "users", currentUid, "friends", friendUid), {
       uid: friendUid,
       displayName: friendDisplayName,
       addedAt: now,
     }),
-    // 相手 → 自分
+    // 相手 → 自分. 自分のdb中の, users/{friendUid}/friends/{currentUid}{...}を書き込んでいる.
     setDoc(doc(db, "users", friendUid, "friends", currentUid), {
       uid: currentUid,
       displayName: currentDisplayName,
@@ -53,7 +53,7 @@ export function subscribeToFriends(
   callback: (friends: FriendData[]) => void
 ): () => void {
   const friendsRef = collection(db, "users", uid, "friends");
-  return onSnapshot(friendsRef, (snapshot) => {
+  return onSnapshot(friendsRef, (snapshot) => { // データの変更を監視する.
     const friends: FriendData[] = snapshot.docs.map((d) => {
       const data = d.data();
       return {
@@ -62,6 +62,6 @@ export function subscribeToFriends(
         addedAt: data.addedAt?.toDate() ?? null,
       };
     });
-    callback(friends);
+    callback(friends); // 後で実行される関数を渡す仕組み. friendsデータが取れた瞬間に, subscribeToFriendsに引数を渡す.
   });
 }

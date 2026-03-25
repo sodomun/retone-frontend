@@ -23,10 +23,10 @@ export default function ChatPage() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         router.replace("/login");
+        setLoading(false);
       } else {
         setUser(currentUser);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, [router]);
@@ -47,6 +47,7 @@ export default function ChatPage() {
     const chatId = getChatId(user.uid, partnerUid);
     const unsubscribe = subscribeToMessages(chatId, (msgs) => {
       setMessages(msgs);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, [user, partnerUid]);

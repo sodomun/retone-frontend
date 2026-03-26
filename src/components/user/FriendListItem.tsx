@@ -33,6 +33,30 @@ export default function FriendListItem({ displayName, chatId, myUid, onClick }: 
 
   const lastMessageText = chat?.lastMessage ?? "メッセージがありません。";
 
+  const lastMessageTimeStr = (() => {
+    if (!chat?.lastMessageAt) return "";
+    const date = chat.lastMessageAt.toDate();
+    const now = new Date();
+    const isToday =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate();
+    if (isToday) {
+      return date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    }
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getFullYear() === yesterday.getFullYear() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getDate() === yesterday.getDate();
+    if (isYesterday) return "昨日";
+    if (date.getFullYear() === now.getFullYear()) {
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+  })();
+
   return (
     <div
       onClick={onClick}
@@ -47,9 +71,14 @@ export default function FriendListItem({ displayName, chatId, myUid, onClick }: 
     >
       <ProfileAvatar displayName={displayName} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontWeight: isUnread ? "bold" : "normal" }}>
-          {displayName}
-        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <p style={{ margin: 0, fontWeight: isUnread ? "bold" : "normal" }}>
+            {displayName}
+          </p>
+          <span style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>
+            {lastMessageTimeStr}
+          </span>
+        </div>
         <p
           style={{
             margin: 0,

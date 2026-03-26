@@ -84,17 +84,8 @@ export default function ChatPage() {
   if (loading) return <p>読み込み中...</p>;
   if (!user) return null;
 
-  // 相手が既読にした最後の自分のメッセージIDを特定
-  const partnerReadAtMs = chat?.readBy?.[partnerUid]?.toMillis() ?? 0; // 右がundefinedなら, 左の値を用いるという意味.
-  const lastReadMsgId = (() => {
-    if (!partnerReadAtMs) return null;
-    const myReadMessages = messages.filter(
-      (m) =>
-        m.senderUid === user.uid && // 自分が送信元のメッセージ
-        (m.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs // 自分が送信元のメッセージの作成時刻 <= 相手の最後にチャット画面を開いた時刻 になるメッセージだけを抽出.
-    );
-    return myReadMessages.at(-1)?.id ?? null;
-  })();
+  // 相手が既読にした時刻（ミリ秒）
+  const partnerReadAtMs = chat?.readBy?.[partnerUid]?.toMillis() ?? 0;
 
   return (
     <div
@@ -114,7 +105,11 @@ export default function ChatPage() {
             text={msg.text}
             isMine={msg.senderUid === user.uid}
             createdAt={msg.createdAt}
-            isRead={msg.id === lastReadMsgId}
+            isRead={
+              msg.senderUid === user.uid &&
+              partnerReadAtMs > 0 &&
+              (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
+            }
           />
         ))}
         <div ref={bottomRef} />

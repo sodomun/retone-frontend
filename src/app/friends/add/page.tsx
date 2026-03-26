@@ -47,6 +47,7 @@ export default function AddFriendPage() {
 
   async function handleAdd() {
     if (!user || !result) return;
+    if (result.uid === user.uid) return;
     setAdding(true);
 
     // 自分のdisplayNameをFirestoreから取得

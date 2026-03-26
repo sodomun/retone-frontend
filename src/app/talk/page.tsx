@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeToFriends, FriendData } from "@/lib/friends";
+import { getChatId } from "@/lib/chat";
 import TalkHeader from "@/components/talk/TalkHeader";
 import FriendListItem from "@/components/user/FriendListItem";
 
@@ -51,6 +52,8 @@ export default function TalkPage() {
               key={f.uid}
               uid={f.uid}
               displayName={f.displayName}
+              chatId={getChatId(user.uid, f.uid)}
+              myUid={user.uid}
               onClick={() => router.push(`/talk/${f.uid}`)}
             />
           ))

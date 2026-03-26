@@ -6,6 +6,8 @@ import {
   query,
   serverTimestamp,
   Timestamp,
+  doc,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -16,12 +18,19 @@ export type Message = {
   createdAt: Date | null;
 };
 
+export type Chat = {
+  lastMessage?: string;
+  lastMessageAt?: Timestamp;
+  lastMessageSenderId?: string;
+  readBy?: Record<string, Timestamp>;
+};
+
 /** 2人のuidからチャットIDを生成する（常に同じIDになるようソート） */
 export function getChatId(uid1: string, uid2: string): string {
   return [uid1, uid2].sort().join("_");
 }
 
-/** メッセージを送信する */
+/** メッセージを送信し、chats/{chatId} の lastMessage も更新する */
 export async function sendMessage(
   chatId: string,
   senderUid: string,
@@ -31,6 +40,36 @@ export async function sendMessage(
     senderUid,
     text,
     createdAt: serverTimestamp(),
+  });
+
+  // ドキュメント未作成の場合も考慮して setDoc + merge
+  await setDoc(
+    doc(db, "chats", chatId),
+    {
+      lastMessage: text,
+      lastMessageAt: serverTimestamp(),
+      lastMessageSenderId: senderUid,
+    },
+    { merge: true }
+  );
+}
+
+/** チャット画面に入った時点で既読とする */
+export async function markAsRead(chatId: string, uid: string): Promise<void> {
+  await setDoc(
+    doc(db, "chats", chatId),
+    { [`readBy.${uid}`]: serverTimestamp() },
+    { merge: true }
+  );
+}
+
+/** chats/{chatId} ドキュメントをリアルタイム購読する */
+export function subscribeToChatData(
+  chatId: string,
+  callback: (chat: Chat | null) => void
+): () => void {
+  return onSnapshot(doc(db, "chats", chatId), (snap) => {
+    callback(snap.exists() ? (snap.data() as Chat) : null);
   });
 }
 

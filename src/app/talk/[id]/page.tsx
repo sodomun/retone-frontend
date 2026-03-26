@@ -5,7 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { getChatId, sendMessage, subscribeToMessages, Message } from "@/lib/chat";
+import {
+  getChatId,
+  sendMessage,
+  subscribeToMessages,
+  subscribeToChatData,
+  markAsRead,
+  Message,
+  Chat,
+} from "@/lib/chat";
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageBubble from "@/components/chat/MessageBubble";
 import MessageInput from "@/components/chat/MessageInput";
@@ -16,6 +24,7 @@ export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
   const [partnerName, setPartnerName] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chat, setChat] = useState<Chat | null>(null);
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -41,14 +50,23 @@ export default function ChatPage() {
     });
   }, [partnerUid]);
 
-  // メッセージをリアルタイム取得
+  // メッセージをリアルタイム取得 & 既読処理
   useEffect(() => {
     if (!user || !partnerUid) return;
     const chatId = getChatId(user.uid, partnerUid);
     const unsubscribe = subscribeToMessages(chatId, (msgs) => {
       setMessages(msgs);
       setLoading(false);
+      markAsRead(chatId, user.uid);
     });
+    return () => unsubscribe();
+  }, [user, partnerUid]);
+
+  // チャットデータ購読
+  useEffect(() => {
+    if (!user || !partnerUid) return;
+    const chatId = getChatId(user.uid, partnerUid);
+    const unsubscribe = subscribeToChatData(chatId, setChat);
     return () => unsubscribe();
   }, [user, partnerUid]);
 
@@ -65,6 +83,18 @@ export default function ChatPage() {
 
   if (loading) return <p>読み込み中...</p>;
   if (!user) return null;
+
+  // 相手が既読にした最後の自分のメッセージIDを特定
+  const partnerReadAtMs = chat?.readBy?.[partnerUid]?.toMillis() ?? 0;
+  const lastReadMsgId = (() => {
+    if (!partnerReadAtMs) return null;
+    const myReadMessages = messages.filter(
+      (m) =>
+        m.senderUid === user.uid &&
+        (m.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
+    );
+    return myReadMessages.at(-1)?.id ?? null;
+  })();
 
   return (
     <div
@@ -84,6 +114,7 @@ export default function ChatPage() {
             text={msg.text}
             isMine={msg.senderUid === user.uid}
             createdAt={msg.createdAt}
+            isRead={msg.id === lastReadMsgId}
           />
         ))}
         <div ref={bottomRef} />

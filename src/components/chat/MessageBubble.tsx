@@ -2,9 +2,10 @@ type Props = {
   text: string;
   isMine: boolean;
   createdAt: Date | null;
+  isRead?: boolean;
 };
 
-export default function MessageBubble({ text, isMine, createdAt }: Props) {
+export default function MessageBubble({ text, isMine, createdAt, isRead }: Props) {
   const timeStr = createdAt
     ? createdAt.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
     : "";
@@ -37,9 +38,14 @@ export default function MessageBubble({ text, isMine, createdAt }: Props) {
         >
           {text}
         </div>
-        {timeStr && (
-          <span style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{timeStr}</span>
-        )}
+        <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+          {isMine && isRead && (
+            <span style={{ fontSize: 10, color: "#999" }}>既読</span>
+          )}
+          {timeStr && (
+            <span style={{ fontSize: 10, color: "#999" }}>{timeStr}</span>
+          )}
+        </div>
       </div>
     </div>
   );

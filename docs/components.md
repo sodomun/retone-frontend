@@ -80,14 +80,17 @@ useEffect(() => {
 
 ### isRead の決まり方
 
-チャット画面（`page.tsx`）で `lastReadMsgId` が計算される：
+チャット画面（`page.tsx`）で各メッセージに直接判定される：
 
 ```typescript
-// 全メッセージの中で「既読マークをつけるメッセージのID」
-isRead={msg.id === lastReadMsgId}
+isRead={
+  msg.senderUid === user.uid &&
+  partnerReadAtMs > 0 &&
+  (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
+}
 ```
 
-全メッセージに `map()` でループし、`lastReadMsgId` と一致するメッセージだけ `isRead = true` になる。つまり既読マークは常に**最大1件**にしか表示されない。
+「自分が送った」かつ「相手が開いた時刻以前に送った」メッセージすべてに `isRead = true` が渡される。相手がチャットを開くと、それ以前に送った自分のメッセージ全件に既読マークが表示される。
 
 ---
 

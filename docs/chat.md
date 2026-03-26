@@ -150,27 +150,26 @@ return onSnapshot(doc(db, "chats", chatId), (snap) => {
 
 ## 既読判定ロジック
 
-### 相手が既読にした最後のメッセージを特定する（チャット画面）
+### 各メッセージに既読マークをつける（チャット画面）
 
 ```typescript
 const partnerReadAtMs = chat?.readBy?.[partnerUid]?.toMillis() ?? 0;
 
-const lastReadMsgId = (() => {
-  if (!partnerReadAtMs) return null;
-  const myReadMessages = messages.filter(
-    (m) =>
-      m.senderUid === user.uid &&
-      (m.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs,
-  );
-  return myReadMessages.at(-1)?.id ?? null;
-})();
+// MessageBubble の isRead に直接渡す
+isRead={
+  msg.senderUid === user.uid &&
+  partnerReadAtMs > 0 &&
+  (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
+}
 ```
 
 **考え方：**
 
 - `partnerReadAtMs`：相手が最後にチャット画面を開いた時刻（ミリ秒）
-- 「自分が送ったメッセージ」かつ「相手が開いた時刻以前に送ったもの」を抽出
-- その中で最も新しいメッセージだけに「既読」を表示（LINE と同じ挙動）
+- 以下の3条件をすべて満たすメッセージに「既読」を表示する
+  1. 自分が送ったメッセージ
+  2. 相手が一度でもチャットを開いている（`partnerReadAtMs > 0`）
+  3. 相手が開いた時刻以前に送ったもの（`createdAt <= partnerReadAtMs`）
 
 **`Infinity` を使う理由：**
-`createdAt` が `null`（送信直後で時刻未確定）のメッセージは `Infinity` 扱いにして、フィルターから確実に除外する。
+`createdAt` が `null`（送信直後で時刻未確定）のメッセージは `Infinity` 扱いにして、条件3を満たさないよう除外する。

@@ -20,8 +20,14 @@ export default function FriendListItem({ displayName, chatId, myUid, onClick }: 
   }, [chatId]);
 
   const isUnread = (() => {
+    console.log("chat:", chat);
+    console.log("myUid:", myUid);
+    console.log("readBy:", chat?.readBy);
+    console.log("readBy[myUid]:", chat?.readBy?.[myUid]);
     if (!chat?.lastMessageAt) return false;
     const readAtMs = chat.readBy?.[myUid]?.toMillis() ?? 0;
+    console.log("lastMessageAt ms:", chat.lastMessageAt.toMillis());
+    console.log("readAtMs:", readAtMs);
     return chat.lastMessageAt.toMillis() > readAtMs;
   })();
 

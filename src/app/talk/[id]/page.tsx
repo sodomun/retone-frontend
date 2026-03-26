@@ -85,13 +85,13 @@ export default function ChatPage() {
   if (!user) return null;
 
   // 相手が既読にした最後の自分のメッセージIDを特定
-  const partnerReadAtMs = chat?.readBy?.[partnerUid]?.toMillis() ?? 0;
+  const partnerReadAtMs = chat?.readBy?.[partnerUid]?.toMillis() ?? 0; // 右がundefinedなら, 左の値を用いるという意味.
   const lastReadMsgId = (() => {
     if (!partnerReadAtMs) return null;
     const myReadMessages = messages.filter(
       (m) =>
-        m.senderUid === user.uid &&
-        (m.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
+        m.senderUid === user.uid && // 自分が送信元のメッセージ
+        (m.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs // 自分が送信元のメッセージの作成時刻 <= 相手の最後にチャット画面を開いた時刻 になるメッセージだけを抽出.
     );
     return myReadMessages.at(-1)?.id ?? null;
   })();
@@ -108,7 +108,7 @@ export default function ChatPage() {
     >
       <ChatHeader displayName={partnerName || partnerUid} />
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-        {messages.map((msg) => (
+        {messages.map((msg) => ( // messages.map()が全メッセージを表している. for文と同じ要領で, msgを1つのMessageBubbleとして扱っている.
           <MessageBubble
             key={msg.id}
             text={msg.text}

@@ -8,6 +8,7 @@ import {
   Timestamp,
   doc,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -56,10 +57,9 @@ export async function sendMessage(
 
 /** チャット画面に入った時点で既読とする */
 export async function markAsRead(chatId: string, uid: string): Promise<void> {
-  await setDoc(
+  await updateDoc(
     doc(db, "chats", chatId),
-    { [`readBy.${uid}`]: serverTimestamp() },
-    { merge: true }
+    { [`readBy.${uid}`]: serverTimestamp() }
   );
 }
 
@@ -69,7 +69,7 @@ export function subscribeToChatData(
   callback: (chat: Chat | null) => void
 ): () => void {
   return onSnapshot(doc(db, "chats", chatId), (snap) => {
-    callback(snap.exists() ? (snap.data() as Chat) : null);
+    callback(snap.exists() ? (snap.data({ serverTimestamps: "estimate" }) as Chat) : null);
   });
 }
 

@@ -51,7 +51,7 @@ useEffect(() => {
 **ファイル：** `src/components/chat/MessageBubble.tsx`
 
 ### 概要
-チャット画面（`/talk/[id]`）に表示されるメッセージ1件分のバブル。送受信の向き・既読表示・送信時刻を担う。
+チャット画面（`/talk/[id]`）に表示されるメッセージ1件分のバブル。送受信の向き・既読表示・送信時刻・相手のアバターを担う。
 
 ### Props
 
@@ -61,17 +61,19 @@ useEffect(() => {
 | isMine | boolean | 自分が送ったメッセージかどうか |
 | createdAt | Date \| null | 送信時刻 |
 | isRead | boolean（省略可） | 既読マークを表示するかどうか |
+| displayName | string（省略可） | 相手の名前（アバター表示に使用） |
 
 ### 表示の振る舞い
 
 ```
-自分のメッセージ（isMine = true）
-  → 右寄せ・青いバブル
-  → isRead = true のとき「既読」テキストを表示
-
 相手のメッセージ（isMine = false）
-  → 左寄せ・グレーのバブル
-  → 既読表示なし
+  [アバター] [グレーのバブル]
+  ← 左寄せ。アバターは ProfileAvatar（32px）
+
+自分のメッセージ（isMine = true）
+             [青いバブル]
+             既読  12:34
+  → 右寄せ。isRead = true のとき「既読」テキストを表示
 ```
 
 ### なぜ自分のメッセージにしか既読を表示しないのか
@@ -101,6 +103,20 @@ isRead={
 ### 概要
 ユーザーのアバター。画像は持たず、`displayName` の先頭1文字を丸の中に表示する。
 
+### Props
+
+| Prop | 型 | デフォルト | 説明 |
+|------|-----|-----------|------|
+| displayName | string | — | 表示名（先頭1文字を使用） |
+| size | number | 40 | 直径（px） |
+
+### 使用箇所
+- `FriendListItem`：トーク一覧の各行（40px）
+- `MessageBubble`：相手メッセージの左横（32px）
+- `settings/page.tsx`：設定画面のプロフィールカード（56px）
+- `settings/profile/page.tsx`：プロフィール詳細（80px）
+- `AddFriendItem`：友達追加の検索結果
+
 ---
 
 ## ChatHeader
@@ -108,7 +124,7 @@ isRead={
 **ファイル：** `src/components/chat/ChatHeader.tsx`
 
 ### 概要
-チャット画面上部のヘッダー。相手の `displayName` を表示する。
+チャット画面上部のヘッダー。戻るボタンと相手の `displayName` を表示する。`position: sticky` で画面上部に固定される。
 
 ---
 
@@ -117,4 +133,91 @@ isRead={
 **ファイル：** `src/components/chat/MessageInput.tsx`
 
 ### 概要
-メッセージ入力欄と送信ボタン。入力内容を `onSend` コールバック経由で親（チャット画面）に渡す。
+メッセージ入力欄と送信ボタン。入力内容を `onSend` コールバック経由で親（チャット画面）に渡す。テキストが空のとき送信ボタンはグレーアウトする。
+
+---
+
+## TalkHeader
+
+**ファイル：** `src/components/talk/TalkHeader.tsx`
+
+### 概要
+トーク一覧画面のヘッダー。「トーク」タイトルと「+ 友達追加」ボタンを表示する。`position: sticky` で画面上部に固定される。
+
+---
+
+## Footer
+
+**ファイル：** `src/components/common/Footer.tsx`
+
+### 概要
+トーク一覧（`/talk`）・設定（`/settings`）画面のボトムナビゲーション。現在のパスに応じてアクティブなタブをハイライトする。
+
+### タブ構成
+
+| タブ | パス | アイコン |
+|------|------|---------|
+| トーク | /talk | 💬 |
+| 設定 | /settings | ⚙️ |
+
+### アクティブ判定
+
+```typescript
+const isActive = pathname === tab.href || pathname.startsWith(tab.href + "/");
+```
+
+`/talk/someId` のようなサブパスでも、トークタブがアクティブになる。
+
+---
+
+## LogoutModal
+
+**ファイル：** `src/components/common/LogoutModal.tsx`
+
+### 概要
+ログアウト確認のモーダルダイアログ。設定画面（`/settings`）の「ログアウト」ボタンから表示される。
+
+### Props
+
+| Prop | 型 | 説明 |
+|------|-----|------|
+| onCancel | () => void | キャンセルボタンを押したときの処理 |
+| onConfirm | () => void | ログアウトボタンを押したときの処理 |
+
+### 構造
+
+```
+[暗い透過オーバーレイ] ← クリックしても何もしない
+[モーダル本体]
+  ログアウト
+  ログアウトしますか？
+  [キャンセル]  [ログアウト（赤）]
+```
+
+オーバーレイと本体を `position: fixed` で重ねて表示する。`zIndex` はオーバーレイが 100、本体が 101。
+
+### ログアウトの流れ
+
+```
+OKボタン押下
+  → onConfirm() → signOut(auth)
+  → onAuthStateChanged が currentUser=null で発火
+  → router.replace("/login") でリダイレクト
+```
+
+### なぜコンポーネントに分離したか
+
+インラインで書くとモーダルのスタイルコードで `settings/page.tsx` が長くなるため。`LogoutModal` に切り出すことで、設定ページ側のモーダル関連コードは以下の3行のみになる：
+
+```tsx
+{showLogoutModal && (
+  <LogoutModal
+    onCancel={() => setShowLogoutModal(false)}
+    onConfirm={handleLogout}
+  />
+)}
+```
+
+### パラレル/インターセプトルートを使わない理由
+
+Next.js のパラレル/インターセプトルートはモーダルに独自の URL を持たせる用途（例：画像ライトボックス）に向いている。ログアウト確認は URL 不要の単純なダイアログのため、コンポーネント分離で十分。

@@ -8,6 +8,7 @@ import { subscribeToFriends, FriendData } from "@/lib/friends";
 import { getChatId } from "@/lib/chat";
 import TalkHeader from "@/components/talk/TalkHeader";
 import FriendListItem from "@/components/user/FriendListItem";
+import Footer from "@/components/common/Footer";
 
 export default function TalkPage() {
   const router = useRouter();
@@ -39,11 +40,20 @@ export default function TalkPage() {
   if (!user) return null;
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto" }}>
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 640,
+        margin: "0 auto",
+        display: "flex",
+        flexDirection: "column",
+        height: "100dvh",
+      }}
+    >
       <TalkHeader />
-      <div style={{ padding: "0 16px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px" }}>
         {friends.length === 0 ? (
-          <p style={{ color: "#888", marginTop: 24, textAlign: "center" }}>
+          <p style={{ color: "var(--subtext-color)", marginTop: 24, textAlign: "center" }}>
             友達がいません。友達追加ボタンから追加してください。
           </p>
         ) : (
@@ -59,6 +69,7 @@ export default function TalkPage() {
           ))
         )}
       </div>
+      <Footer />
     </div>
   );
 }

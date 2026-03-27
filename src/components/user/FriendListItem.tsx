@@ -66,7 +66,7 @@ export default function FriendListItem({ displayName, chatId, myUid, onClick }: 
         gap: 12,
         padding: "12px 0",
         cursor: onClick ? "pointer" : "default",
-        borderBottom: "1px solid #eee",
+        borderBottom: "1px solid var(--border-color)",
       }}
     >
       <ProfileAvatar displayName={displayName} />
@@ -75,7 +75,7 @@ export default function FriendListItem({ displayName, chatId, myUid, onClick }: 
           <p style={{ margin: 0, fontWeight: isUnread ? "bold" : "normal" }}>
             {displayName}
           </p>
-          <span style={{ fontSize: 11, color: "#aaa", flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: "var(--timestamp-color)", flexShrink: 0 }}>
             {lastMessageTimeStr}
           </span>
         </div>
@@ -83,7 +83,7 @@ export default function FriendListItem({ displayName, chatId, myUid, onClick }: 
           style={{
             margin: 0,
             fontSize: 12,
-            color: isUnread ? "#000" : "#888",
+            color: isUnread ? "var(--unread-text)" : "var(--subtext-color)",
             fontWeight: isUnread ? "bold" : "normal",
             overflow: "hidden",
             textOverflow: "ellipsis",

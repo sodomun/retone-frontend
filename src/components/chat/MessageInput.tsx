@@ -22,10 +22,10 @@ export default function MessageInput({ onSend }: Props) {
         display: "flex",
         gap: 8,
         padding: "12px 16px",
-        borderTop: "1px solid #eee",
+        borderTop: "1px solid var(--border-color)",
         position: "sticky",
         bottom: 0,
-        background: "#fff",
+        background: "var(--header-bg)",
       }}
     >
       <input
@@ -38,7 +38,9 @@ export default function MessageInput({ onSend }: Props) {
           flex: 1,
           padding: "8px 12px",
           borderRadius: 20,
-          border: "1px solid #ddd",
+          border: "1px solid var(--input-border)",
+          background: "var(--input-bg)",
+          color: "var(--foreground)",
           fontSize: 14,
           outline: "none",
         }}

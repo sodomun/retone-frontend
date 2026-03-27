@@ -12,7 +12,7 @@ export default function ProfileAvatar({ displayName, size = 40 }: Props) {
         width: size,
         height: size,
         borderRadius: "50%",
-        backgroundColor: "#ccc",
+        backgroundColor: "var(--avatar-bg)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

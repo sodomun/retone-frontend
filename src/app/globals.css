@@ -1,12 +1,38 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --border-color: #eee;
+  --input-border: #ddd;
+  --bubble-partner-bg: #f0f0f0;
+  --bubble-partner-text: #000;
+  --header-bg: #ffffff;
+  --subtext-color: #888;
+  --timestamp-color: #aaa;
+  --input-bg: #ffffff;
+  --unread-text: #000;
+  --avatar-bg: #9ca3af;
+  --footer-bg: #ffffff;
+  --footer-active: #0084ff;
+  --footer-inactive: #aaa;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --border-color: #2a2a2a;
+    --input-border: #3a3a3a;
+    --bubble-partner-bg: #2a2a2a;
+    --bubble-partner-text: #ededed;
+    --header-bg: #111111;
+    --subtext-color: #888;
+    --timestamp-color: #666;
+    --input-bg: #1a1a1a;
+    --unread-text: #ededed;
+    --avatar-bg: #555;
+    --footer-bg: #111111;
+    --footer-active: #4da3ff;
+    --footer-inactive: #666;
   }
 }
 

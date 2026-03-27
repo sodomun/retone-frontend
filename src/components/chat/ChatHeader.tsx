@@ -15,10 +15,10 @@ export default function ChatHeader({ displayName }: Props) {
         alignItems: "center",
         gap: 12,
         padding: "12px 16px",
-        borderBottom: "1px solid #eee",
+        borderBottom: "1px solid var(--border-color)",
         position: "sticky",
         top: 0,
-        background: "#fff",
+        background: "var(--header-bg)",
         zIndex: 10,
       }}
     >

@@ -90,7 +90,8 @@ export default function ChatPage() {
   return (
     <div
       style={{
-        maxWidth: 480,
+        width: "100%",
+        maxWidth: 640,
         margin: "0 auto",
         display: "flex",
         flexDirection: "column",
@@ -110,6 +111,7 @@ export default function ChatPage() {
               partnerReadAtMs > 0 &&
               (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
             }
+            displayName={partnerName || partnerUid}
           />
         ))}
         <div ref={bottomRef} />

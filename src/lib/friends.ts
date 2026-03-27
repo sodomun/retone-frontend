@@ -7,6 +7,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getChatId } from "@/lib/chat";
 
 export type FriendData = {
   uid: string;
@@ -31,6 +32,8 @@ export async function addFriend(
 ): Promise<void> {
   const now = serverTimestamp();
 
+  const chatId = getChatId(currentUid, friendUid);
+
   await Promise.all([
     // 自分 → 相手. 自分のdb中の, users/{currentUid}/friends/{friendUid}{...}を書き込んでいる.
     setDoc(doc(db, "users", currentUid, "friends", friendUid), {
@@ -44,6 +47,14 @@ export async function addFriend(
       displayName: currentDisplayName,
       addedAt: now,
     }),
+    // チャットドキュメントを事前作成。lastMessageAt を友達追加時刻で初期化することで
+    // まだメッセージがない友達も talk/page.tsx でソートできるようにする。
+    // merge: true により既存のチャット履歴がある場合は上書きしない。
+    setDoc(
+      doc(db, "chats", chatId),
+      { lastMessageAt: now },
+      { merge: true }
+    ),
   ]);
 }
 

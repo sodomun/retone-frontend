@@ -1,33 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import ProfileAvatar from "@/components/user/ProfileAvatar";
-import { subscribeToChatData, Chat } from "@/lib/chat";
+import { Chat } from "@/lib/chat";
 
 type Props = {
   displayName: string;
   uid: string;
   chatId: string;
   myUid: string;
+  chat: Chat | null;
   onClick?: () => void;
 };
 
-export default function FriendListItem({ displayName, chatId, myUid, onClick }: Props) {
-  const [chat, setChat] = useState<Chat | null>(null);
-
-  useEffect(() => {
-    return subscribeToChatData(chatId, setChat);
-  }, [chatId]);
-
+export default function FriendListItem({ displayName, myUid, chat, onClick }: Props) {
   const isUnread = (() => {
-    console.log("chat:", chat);
-    console.log("myUid:", myUid);
-    console.log("readBy:", chat?.readBy);
-    console.log("readBy[myUid]:", chat?.readBy?.[myUid]);
     if (!chat?.lastMessageAt) return false;
     const readAtMs = chat.readBy?.[myUid]?.toMillis() ?? 0;
-    console.log("lastMessageAt ms:", chat.lastMessageAt.toMillis());
-    console.log("readAtMs:", readAtMs);
     return chat.lastMessageAt.toMillis() > readAtMs;
   })();
 

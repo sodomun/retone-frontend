@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeToFriends, FriendData } from "@/lib/friends";
-import { getChatId } from "@/lib/chat";
+import { getChatId, subscribeToChatData, Chat } from "@/lib/chat";
 import TalkHeader from "@/components/talk/TalkHeader";
 import FriendListItem from "@/components/user/FriendListItem";
 import Footer from "@/components/common/Footer";
@@ -14,6 +14,7 @@ export default function TalkPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [friends, setFriends] = useState<FriendData[]>([]);
+  const [chatDataMap, setChatDataMap] = useState<Record<string, Chat | null>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,8 +37,27 @@ export default function TalkPage() {
     return () => unsubscribe();
   }, [user]);
 
+  // 全友達のチャットデータを購読。友達リストが変わるたびに再購読する。
+  useEffect(() => {
+    if (!user || friends.length === 0) return;
+    const unsubscribers = friends.map((f) => {
+      const chatId = getChatId(user.uid, f.uid);
+      return subscribeToChatData(chatId, (chat) => {
+        setChatDataMap((prev) => ({ ...prev, [chatId]: chat }));
+      });
+    });
+    return () => unsubscribers.forEach((u) => u());
+  }, [user, friends]);
+
   if (loading) return <p>読み込み中...</p>;
   if (!user) return null;
+
+  // lastMessageAt の降順でソート（新しいチャットが上に来る）
+  const sortedFriends = [...friends].sort((a, b) => {
+    const timeA = chatDataMap[getChatId(user.uid, a.uid)]?.lastMessageAt?.toMillis() ?? 0;
+    const timeB = chatDataMap[getChatId(user.uid, b.uid)]?.lastMessageAt?.toMillis() ?? 0;
+    return timeB - timeA;
+  });
 
   return (
     <div
@@ -52,21 +72,25 @@ export default function TalkPage() {
     >
       <TalkHeader />
       <div style={{ flex: 1, overflowY: "auto", padding: "0 16px" }}>
-        {friends.length === 0 ? (
+        {sortedFriends.length === 0 ? (
           <p style={{ color: "var(--subtext-color)", marginTop: 24, textAlign: "center" }}>
             友達がいません。友達追加ボタンから追加してください。
           </p>
         ) : (
-          friends.map((f) => (
-            <FriendListItem
-              key={f.uid}
-              uid={f.uid}
-              displayName={f.displayName}
-              chatId={getChatId(user.uid, f.uid)}
-              myUid={user.uid}
-              onClick={() => router.push(`/talk/${f.uid}`)}
-            />
-          ))
+          sortedFriends.map((f) => {
+            const chatId = getChatId(user.uid, f.uid);
+            return (
+              <FriendListItem
+                key={f.uid}
+                uid={f.uid}
+                displayName={f.displayName}
+                chatId={chatId}
+                myUid={user.uid}
+                chat={chatDataMap[chatId] ?? null}
+                onClick={() => router.push(`/talk/${f.uid}`)}
+              />
+            );
+          })
         )}
       </div>
       <Footer />

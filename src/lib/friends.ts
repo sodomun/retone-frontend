@@ -52,7 +52,12 @@ export async function addFriend(
     // merge: true により既存のチャット履歴がある場合は上書きしない。
     setDoc(
       doc(db, "chats", chatId),
-      { lastMessageAt: now },
+      {
+        type: "direct",
+        members: [currentUid, friendUid],
+        memberNames: { [currentUid]: currentDisplayName, [friendUid]: friendDisplayName },
+        lastMessageAt: now,
+      },
       { merge: true }
     ),
   ]);

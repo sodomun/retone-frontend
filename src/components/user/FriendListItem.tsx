@@ -5,14 +5,13 @@ import { Chat } from "@/lib/chat";
 
 type Props = {
   displayName: string;
-  uid: string;
-  chatId: string;
   myUid: string;
   chat: Chat | null;
+  isGroup?: boolean;
   onClick?: () => void;
 };
 
-export default function FriendListItem({ displayName, myUid, chat, onClick }: Props) {
+export default function FriendListItem({ displayName, myUid, chat, isGroup = false, onClick }: Props) {
   const isUnread = (() => {
     if (!chat?.lastMessageAt) return false;
     const readAtMs = chat.readBy?.[myUid]?.toMillis() ?? 0;
@@ -57,7 +56,25 @@ export default function FriendListItem({ displayName, myUid, chat, onClick }: Pr
         borderBottom: "1px solid var(--border-color)",
       }}
     >
-      <ProfileAvatar displayName={displayName} />
+      {isGroup ? (
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            background: "var(--avatar-bg)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            flexShrink: 0,
+          }}
+        >
+          👥
+        </div>
+      ) : (
+        <ProfileAvatar displayName={displayName} />
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <p style={{ margin: 0, fontWeight: isUnread ? "bold" : "normal" }}>

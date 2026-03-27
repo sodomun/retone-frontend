@@ -5,16 +5,29 @@
 **ファイル：** `src/components/user/FriendListItem.tsx`
 
 ### 概要
-トーク一覧画面（`/talk`）に表示される友達1人分のリスト項目。アバター・名前・最新メッセージ・未読インジケーターを表示する。
+トーク一覧画面（`/talk`）に表示されるチャット1件分のリスト項目。1:1・グループ共通で使用する。アバター・名前・最新メッセージ・未読インジケーターを表示する。
+
+### Props
+
+| Prop | 型 | 説明 |
+|------|-----|------|
+| displayName | string | 表示名（1:1は相手の名前、グループはグループ名） |
+| myUid | string | 自分の UID（未読判定に使用） |
+| chat | Chat \| null | チャットデータ（親から渡される） |
+| isGroup | boolean（省略可） | グループチャットかどうか（デフォルト false） |
+| onClick | () => void（省略可） | タップ時の処理 |
 
 ### 表示内容
 
 ```
-[アバター] 友達の名前          [青い丸] ← 未読時のみ
-           最新メッセージのプレビュー
-```
+1:1チャット:
+[ProfileAvatar] 相手の名前          [青い丸] ← 未読時のみ
+                最新メッセージのプレビュー
 
-未読のとき：名前と本文が**太字**になり、右端に**青い丸**が表示される。
+グループチャット:
+[👥アイコン]   グループ名           [青い丸] ← 未読時のみ
+                最新メッセージのプレビュー
+```
 
 ### 未読判定の仕組み
 
@@ -26,23 +39,21 @@ const isUnread = (() => {
 })();
 ```
 
-**判定の考え方：**
 ```
 lastMessageAt（最後にメッセージが来た時刻）
   > readBy[myUid]（自分が最後にチャットを開いた時刻）
 
-→ true  = 最後のメッセージをまだ読んでいない → 未読
-→ false = 最後のメッセージを読んでいる → 既読
+→ true  = まだ読んでいない → 未読
+→ false = 読んでいる → 既読
 ```
 
-**チャットデータの購読：**
-```typescript
-useEffect(() => {
-  return subscribeToChatData(chatId, setChat);
-}, [chatId]);
-```
+### chat を props で受け取る理由
 
-`subscribeToChatData` の `onSnapshot` が Firestore のリアルタイム更新を受け取るたびに `chat` ステートが更新され、`isUnread` が再計算される。
+以前は `FriendListItem` 内で `subscribeToChatData` を呼んでいたが、それだと親（`talk/page.tsx`）がソートに必要な `lastMessageAt` を知ることができず、かつ Firestore の読み取りが二重になっていた。
+
+`talk/page.tsx` で全チャットを一括購読（`subscribeToChats`）し、各 `FriendListItem` には結果を props として渡すことで：
+- ソートを親が管理できる
+- Firestore の読み取りが重複しない
 
 ---
 
@@ -51,7 +62,7 @@ useEffect(() => {
 **ファイル：** `src/components/chat/MessageBubble.tsx`
 
 ### 概要
-チャット画面（`/talk/[id]`）に表示されるメッセージ1件分のバブル。送受信の向き・既読表示・送信時刻・相手のアバターを担う。
+チャット画面（`/talk/[id]`）に表示されるメッセージ1件分のバブル。送受信の向き・既読表示・送信時刻・送信者のアバターを担う。1:1・グループ共通で使用できる。
 
 ### Props
 
@@ -60,8 +71,8 @@ useEffect(() => {
 | text | string | メッセージ本文 |
 | isMine | boolean | 自分が送ったメッセージかどうか |
 | createdAt | Date \| null | 送信時刻 |
-| isRead | boolean（省略可） | 既読マークを表示するかどうか |
-| displayName | string（省略可） | 相手の名前（アバター表示に使用） |
+| isRead | boolean（省略可） | 既読マークを表示するかどうか（1:1のみ） |
+| displayName | string（省略可） | 送信者の名前（`chat.memberNames[msg.senderUid]` から取得） |
 
 ### 表示の振る舞い
 
@@ -69,30 +80,17 @@ useEffect(() => {
 相手のメッセージ（isMine = false）
   [アバター] [グレーのバブル]
   ← 左寄せ。アバターは ProfileAvatar（32px）
+  グループでは送信者ごとに異なる名前のアバターが表示される
 
 自分のメッセージ（isMine = true）
              [青いバブル]
              既読  12:34
-  → 右寄せ。isRead = true のとき「既読」テキストを表示
+  → 右寄せ。isRead = true のとき「既読」テキストを表示（1:1のみ）
 ```
 
 ### なぜ自分のメッセージにしか既読を表示しないのか
 
-「既読」とは「相手が自分のメッセージを読んだ」という情報であり、相手のメッセージに対しては意味をなさないため。
-
-### isRead の決まり方
-
-チャット画面（`page.tsx`）で各メッセージに直接判定される：
-
-```typescript
-isRead={
-  msg.senderUid === user.uid &&
-  partnerReadAtMs > 0 &&
-  (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
-}
-```
-
-「自分が送った」かつ「相手が開いた時刻以前に送った」メッセージすべてに `isRead = true` が渡される。相手がチャットを開くと、それ以前に送った自分のメッセージ全件に既読マークが表示される。
+「既読」とは「相手が自分のメッセージを読んだ」という情報であり、相手のメッセージに対しては意味をなさないため。またグループチャットでは複数人の既読状態を1つの表示にまとめることが複雑なため、現状は非表示としている。
 
 ---
 
@@ -111,11 +109,13 @@ isRead={
 | size | number | 40 | 直径（px） |
 
 ### 使用箇所
-- `FriendListItem`：トーク一覧の各行（40px）
+- `FriendListItem`：トーク一覧の各行（40px）、1:1チャットのみ
 - `MessageBubble`：相手メッセージの左横（32px）
 - `settings/page.tsx`：設定画面のプロフィールカード（56px）
 - `settings/profile/page.tsx`：プロフィール詳細（80px）
 - `AddFriendItem`：友達追加の検索結果
+- `talk/new-group/page.tsx`：グループ作成の友達選択画面
+- `talk/new-group/profile/page.tsx`：グループプロフィール設定のメンバー一覧（48px）
 
 ---
 
@@ -124,7 +124,7 @@ isRead={
 **ファイル：** `src/components/chat/ChatHeader.tsx`
 
 ### 概要
-チャット画面上部のヘッダー。戻るボタンと相手の `displayName` を表示する。`position: sticky` で画面上部に固定される。
+チャット画面上部のヘッダー。戻るボタンと `displayName` を表示する。`position: sticky` で画面上部に固定される。1:1では相手の名前、グループではグループ名が渡される。
 
 ---
 
@@ -142,7 +142,12 @@ isRead={
 **ファイル：** `src/components/talk/TalkHeader.tsx`
 
 ### 概要
-トーク一覧画面のヘッダー。「トーク」タイトルと「+ 友達追加」ボタンを表示する。`position: sticky` で画面上部に固定される。
+トーク一覧画面のヘッダー。「グループ作成」ボタンと「+ 友達追加」ボタンを表示する。`position: sticky` で画面上部に固定される。
+
+| ボタン | 遷移先 | スタイル |
+|---|---|---|
+| グループ作成 | `/talk/new-group` | 青枠・白背景 |
+| + 友達追加 | `/friends/add` | 青背景・白文字 |
 
 ---
 
@@ -207,7 +212,7 @@ OKボタン押下
 
 ### なぜコンポーネントに分離したか
 
-インラインで書くとモーダルのスタイルコードで `settings/page.tsx` が長くなるため。`LogoutModal` に切り出すことで、設定ページ側のモーダル関連コードは以下の3行のみになる：
+インラインで書くとモーダルのスタイルコードで `settings/page.tsx` が長くなるため。`LogoutModal` に切り出すことで、設定ページ側のモーダル関連コードは3行のみになる。
 
 ```tsx
 {showLogoutModal && (

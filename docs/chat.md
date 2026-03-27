@@ -8,7 +8,7 @@
 
 ### 概要
 
-メッセージを送信し、チャットドキュメントのサマリーを更新する。
+メッセージを送信し、チャットドキュメントのサマリーを更新する。1:1・グループ共通で使用できる。
 
 ### 処理の流れ
 
@@ -81,30 +81,65 @@ await updateDoc(doc, { "readBy.uid": serverTimestamp() });
 
 ---
 
-### 購読の意味とは？
+## 購読の意味とは？
 
 「購読」= 「変化があったら自動で通知してもらう契約」
-なぜ「購読」と呼ぶのか
 
-雑誌の定期購読と同じ比喩です。
+雑誌の定期購読と同じ比喩。
 
-雑誌の定期購読：
-「毎月新しい号が出たら自動で届けてください」と契約する
-→ 解約するまで届き続ける
+```
+雑誌の定期購読：「毎月新しい号が出たら自動で届けてください」と契約する
+              → 解約するまで届き続ける
 
-onSnapshot：
-「このデータが変わったら自動で通知してください」と登録する
-→ unsubscribe() するまで通知が来続ける
+onSnapshot：  「このデータが変わったら自動で通知してください」と登録する
+              → unsubscribe() するまで通知が来続ける
+```
 
-このアプリでは subscribeToMessages・subscribeToChatData・subscribeToFriends
-の3つが購読を使っており、Firestore
-上のデータが変わると画面が自動で更新される仕組みになっている。
+このアプリでは `subscribeToMessages`・`subscribeToChatData`・`subscribeToChats` が購読を使っており、Firestore 上のデータが変わると画面が自動で更新される仕組みになっている。
+
+---
+
+## subscribeToChats
+
+### 概要
+
+自分が参加している**全チャット**（1:1・グループ共通）を `lastMessageAt` 降順でリアルタイム購読する。`talk/page.tsx` のトーク一覧で使用する。
+
+```typescript
+const q = query(
+  collection(db, "chats"),
+  where("members", "array-contains", uid),
+  orderBy("lastMessageAt", "desc")
+);
+return onSnapshot(q, (snapshot) => {
+  const chats = snapshot.docs.map((d) => ({
+    id: d.id,
+    ...(d.data({ serverTimestamps: "estimate" }) as Chat),
+  }));
+  callback(chats);
+});
+```
+
+### なぜ友達リストからではなくチャットコレクションを直接クエリするのか
+
+旧設計では `subscribeToFriends` → 各 chatId を計算 → 各チャットを個別購読という流れだった。この設計ではグループチャットに対応できない（friendsサブコレクションに友達として登録されていないため）。
+
+`chats` コレクションを `members` フィールドで直接クエリすることで、1:1・グループを問わず自分が参加している全チャットを一括取得できる。
+
+### 複合インデックスが必要な理由
+
+`where("members", "array-contains", uid)` と `orderBy("lastMessageAt", "desc")` は**異なるフィールドへの操作**を組み合わせている。Firestore はこの組み合わせのために事前に複合インデックスを作成しておく必要がある。
+
+インデックスなしの場合：全ドキュメントをスキャンして絞り込み・ソート → ドキュメント数に比例して遅くなる
+インデックスありの場合：`members` × `lastMessageAt` の組み合わせ表が事前に用意されているため直接ジャンプできる
+
+---
 
 ## subscribeToMessages
 
 ### 概要
 
-messages サブコレクションをリアルタイム購読し、メッセージ一覧の変化を通知する。
+messages サブコレクションをリアルタイム購読し、メッセージ一覧の変化を通知する。1:1・グループ共通で使用できる。
 
 ```typescript
 const q = query(messagesRef, orderBy("createdAt", "asc"));
@@ -130,7 +165,7 @@ return onSnapshot(q, (snapshot) => {
 
 ### 概要
 
-`chats/{chatId}` ドキュメントをリアルタイム購読し、`lastMessageAt` や `readBy` の変化を通知する。
+`chats/{chatId}` ドキュメントをリアルタイム購読し、`type` / `memberNames` / `readBy` などの変化を通知する。チャット画面（`/talk/[id]`）で使用する。
 
 ```typescript
 return onSnapshot(doc(db, "chats", chatId), (snap) => {
@@ -148,15 +183,44 @@ return onSnapshot(doc(db, "chats", chatId), (snap) => {
 
 ---
 
+## createGroupChat
+
+### 概要
+
+グループチャットドキュメントを作成し、生成された chatId を返す。`/talk/new-group/profile` の「作成」ボタンから呼ばれる。
+
+```typescript
+const ref = await addDoc(collection(db, "chats"), {
+  type: "group",
+  members,       // 全メンバーの UID 配列（自分含む）
+  memberNames,   // uid → displayName のマップ
+  name: groupName,
+  lastMessageAt: serverTimestamp(),
+});
+return ref.id;
+```
+
+1:1チャットと異なり、`addDoc` で Firestore が自動生成した ID を chatId として使う。
+
+---
+
 ## 既読判定ロジック
 
 ### 各メッセージに既読マークをつける（チャット画面）
 
-```typescript
-const partnerReadAtMs = chat?.readBy?.[partnerUid]?.toMillis() ?? 0;
+1:1チャットのみ。グループチャットでは `isRead` は常に `false`。
 
-// MessageBubble の isRead に直接渡す
+```typescript
+const isGroup = chat?.type === "group";
+const partnerUid = !isGroup
+  ? (chat?.members?.find((uid) => uid !== user.uid) ?? "")
+  : "";
+const partnerReadAtMs = !isGroup
+  ? (chat?.readBy?.[partnerUid]?.toMillis() ?? 0)
+  : 0;
+
 isRead={
+  !isGroup &&
   msg.senderUid === user.uid &&
   partnerReadAtMs > 0 &&
   (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
@@ -166,10 +230,11 @@ isRead={
 **考え方：**
 
 - `partnerReadAtMs`：相手が最後にチャット画面を開いた時刻（ミリ秒）
-- 以下の3条件をすべて満たすメッセージに「既読」を表示する
-  1. 自分が送ったメッセージ
-  2. 相手が一度でもチャットを開いている（`partnerReadAtMs > 0`）
-  3. 相手が開いた時刻以前に送ったもの（`createdAt <= partnerReadAtMs`）
+- 以下の条件をすべて満たすメッセージに「既読」を表示する
+  1. グループチャットでない
+  2. 自分が送ったメッセージ
+  3. 相手が一度でもチャットを開いている（`partnerReadAtMs > 0`）
+  4. 相手が開いた時刻以前に送ったもの（`createdAt <= partnerReadAtMs`）
 
 **`Infinity` を使う理由：**
-`createdAt` が `null`（送信直後で時刻未確定）のメッセージは `Infinity` 扱いにして、条件3を満たさないよう除外する。
+`createdAt` が `null`（送信直後で時刻未確定）のメッセージは `Infinity` 扱いにして、条件4を満たさないよう除外する。

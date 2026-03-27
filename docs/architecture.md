@@ -28,20 +28,41 @@
 UID を入力して検索
   → users/{uid} を getDoc で取得
   → addFriend() で双方向に friends サブコレクションへ書き込み
+  → 同時に chats/{chatId} を事前作成（type, members, memberNames, lastMessageAt を設定）
 ```
 
-### チャット
+### トーク一覧
 ```
-トーク一覧（/talk）
-  → subscribeToFriends で友達一覧をリアルタイム取得
-  → 各友達の chatId を getChatId(myUid, friendUid) で生成
-  → FriendListItem が subscribeToChatData で未読を監視
+/talk
+  → subscribeToChats(user.uid) で自分が参加している全チャットを購読
+    （where("members", "array-contains", uid) + orderBy("lastMessageAt", "desc")）
+  → 1:1・グループ問わず lastMessageAt 降順で表示
+  → 未読判定: lastMessageAt > readBy[myUid]
+```
 
-チャット画面（/talk/[id]）
+### チャット（1:1 / グループ共通）
+```
+/talk/[chatId]  ← URLパラメータは常に chatId（friendUid ではない）
   → subscribeToMessages でメッセージをリアルタイム取得
-  → subscribeToChatData で readBy（既読情報）を監視
+  → subscribeToChatData で chat.type / memberNames / readBy を監視
   → markAsRead で自分の既読タイムスタンプを更新
   → sendMessage でメッセージ送信
+
+1:1の場合: memberNames[partnerUid] でヘッダーの名前を取得
+グループの場合: chat.name でヘッダーの名前を取得、既読表示なし
+```
+
+### グループ作成
+```
+/talk/new-group（友達選択）
+  → subscribeToFriends で友達一覧を取得
+  → チェックボックスで複数選択
+  → 「次へ」→ /talk/new-group/profile?members=uid1,uid2
+
+/talk/new-group/profile（グループプロフィール設定）
+  → URLパラメータの members を分割して各ユーザーの displayName を getDoc で取得
+  → グループ名を入力
+  → 「作成」→ createGroupChat() → /talk/{chatId} にリダイレクト
 ```
 
 ### 設定
@@ -68,7 +89,9 @@ src/
 │   ├── login/              # ログインページ
 │   ├── signup/             # 新規登録ページ
 │   ├── talk/               # トーク一覧ページ
-│   │   └── [id]/           # チャットページ（動的ルート）
+│   │   ├── [id]/           # チャットページ（chatId が動的パラメータ）
+│   │   └── new-group/      # グループ作成：友達選択
+│   │       └── profile/    # グループ作成：プロフィール設定
 │   ├── friends/add/        # 友達追加ページ
 │   └── settings/           # 設定ページ
 │       └── profile/        # プロフィール詳細ページ
@@ -79,11 +102,11 @@ src/
 │   │   ├── MessageInput    # メッセージ入力欄
 │   │   └── ChatHeader      # チャット上部ヘッダー
 │   ├── user/               # ユーザー関連
-│   │   ├── FriendListItem  # 友達一覧の1行
+│   │   ├── FriendListItem  # トーク一覧の1行（1:1・グループ共通）
 │   │   ├── AddFriendItem   # 友達追加の検索結果1行
 │   │   └── ProfileAvatar   # アバター（名前の頭文字）
 │   ├── talk/               # トーク画面専用
-│   │   └── TalkHeader
+│   │   └── TalkHeader      # トーク一覧ヘッダー（友達追加・グループ作成ボタン）
 │   └── common/             # 複数画面で共有
 │       ├── Footer          # ボトムナビゲーション（トーク / 設定）
 │       └── LogoutModal     # ログアウト確認モーダル
@@ -110,6 +133,17 @@ src/
 ```
 ❌ /settings/[id] → URLの id をそのまま getDoc に使う → URL改ざんで他人のデータを取得できる
 ✅ /settings      → currentUser.uid を使う           → 自分のデータしか取得できない
+```
+
+### チャットのアクセス制御
+
+旧設計では `chatId.split("_")` でアクセス制御していたが、グループチャットの chatId は Firestore 自動生成 ID のためこの方法は使えない。
+
+```
+❌ 旧: chatId.split("_") に UID が含まれるか → グループの自動生成 ID では機能しない
+                                              → コレクションクエリでは評価不可
+✅ 新: resource.data.members に UID が含まれるか → 1:1・グループ共通で機能
+                                                  → コレクションクエリでも評価可能
 ```
 
 Firestore Security Rules でも同様のルールを二重に適用することで、クライアントのバグがあっても DB 側で防御できる（PostgreSQL の RLS 相当）。

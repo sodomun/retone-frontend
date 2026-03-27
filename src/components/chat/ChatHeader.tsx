@@ -1,12 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import ProfileAvatar from "@/components/user/ProfileAvatar";
 
 type Props = {
   displayName: string;
+  chatId: string;
 };
 
-export default function ChatHeader({ displayName }: Props) {
+export default function ChatHeader({ displayName, chatId }: Props) {
   const router = useRouter();
   return (
     <div
@@ -31,12 +33,24 @@ export default function ChatHeader({ displayName }: Props) {
           fontSize: 20,
           lineHeight: 1,
           padding: 0,
+          color: "var(--foreground)",
         }}
         aria-label="戻る"
       >
         ←
       </button>
-      <span style={{ fontWeight: "bold", fontSize: 16 }}>{displayName}</span>
+      <div
+        onClick={() => router.push(`/talk/${chatId}/profile`)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: "pointer",
+        }}
+      >
+        <ProfileAvatar displayName={displayName} size={36} />
+        <span style={{ fontWeight: "bold", fontSize: 16 }}>{displayName}</span>
+      </div>
     </div>
   );
 }

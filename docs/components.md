@@ -111,11 +111,13 @@ lastMessageAt（最後にメッセージが来た時刻）
 ### 使用箇所
 - `FriendListItem`：トーク一覧の各行（40px）、1:1チャットのみ
 - `MessageBubble`：相手メッセージの左横（32px）
+- `ChatHeader`：チャットヘッダーのアバター（36px）
 - `settings/page.tsx`：設定画面のプロフィールカード（56px）
 - `settings/profile/page.tsx`：プロフィール詳細（80px）
 - `AddFriendItem`：友達追加の検索結果
 - `talk/new-group/page.tsx`：グループ作成の友達選択画面
 - `talk/new-group/profile/page.tsx`：グループプロフィール設定のメンバー一覧（48px）
+- `talk/[id]/profile/page.tsx`：1:1プロフィール画面（80px）
 
 ---
 
@@ -124,7 +126,14 @@ lastMessageAt（最後にメッセージが来た時刻）
 **ファイル：** `src/components/chat/ChatHeader.tsx`
 
 ### 概要
-チャット画面上部のヘッダー。戻るボタンと `displayName` を表示する。`position: sticky` で画面上部に固定される。1:1では相手の名前、グループではグループ名が渡される。
+チャット画面上部のヘッダー。戻るボタン・ProfileAvatar・表示名を持つ。`position: sticky` で画面上部に固定される。ProfileAvatar と表示名をタップすると `/talk/{chatId}/profile` に遷移する。
+
+### Props
+
+| Prop | 型 | 説明 |
+|------|-----|------|
+| displayName | string | 表示名（1:1は相手の名前、グループはグループ名） |
+| chatId | string | プロフィールページへの遷移に使用 |
 
 ---
 

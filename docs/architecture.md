@@ -65,6 +65,29 @@ UID を入力して検索
   → 「作成」→ createGroupChat() → /talk/{chatId} にリダイレクト
 ```
 
+### プロフィール・友達削除・グループ退会
+```
+/talk/[chatId]/profile（チャット相手 or グループのプロフィール）
+  → ChatHeader の ProfileAvatar をタップで遷移
+  → subscribeToChatData で chat.type を取得
+
+1:1の場合:
+  → 相手の名前・アバターを表示
+  → 「友達を削除する」→ deleteFriend()
+    - users/{myUid}/friends/{partnerUid} を deleteDoc
+    - users/{partnerUid}/friends/{myUid} を deleteDoc（双方向削除）
+    - chats/{chatId} を deleteDoc
+  → /talk にリダイレクト
+
+グループの場合:
+  → グループ名・アバター・メンバー数を表示
+  → 「退会する」→ leaveGroup()
+    - members から自分の UID を arrayRemove
+    - memberNames から自分のエントリを deleteField
+    - 残りメンバーが 0 人なら chats/{chatId} ごと deleteDoc
+  → /talk にリダイレクト
+```
+
 ### 設定
 ```
 設定画面（/settings）
@@ -90,6 +113,7 @@ src/
 │   ├── signup/             # 新規登録ページ
 │   ├── talk/               # トーク一覧ページ
 │   │   ├── [id]/           # チャットページ（chatId が動的パラメータ）
+│   │   │   └── profile/    # チャット相手 or グループのプロフィールページ
 │   │   └── new-group/      # グループ作成：友達選択
 │   │       └── profile/    # グループ作成：プロフィール設定
 │   ├── friends/add/        # 友達追加ページ
@@ -100,7 +124,7 @@ src/
 │   ├── chat/               # チャット画面専用
 │   │   ├── MessageBubble   # 1件のメッセージ表示
 │   │   ├── MessageInput    # メッセージ入力欄
-│   │   └── ChatHeader      # チャット上部ヘッダー
+│   │   └── ChatHeader      # チャット上部ヘッダー（ProfileAvatar タップでプロフィールへ遷移）
 │   ├── user/               # ユーザー関連
 │   │   ├── FriendListItem  # トーク一覧の1行（1:1・グループ共通）
 │   │   ├── AddFriendItem   # 友達追加の検索結果1行
@@ -114,7 +138,8 @@ src/
 └── lib/                    # Firebase 操作・ビジネスロジック
     ├── firebase.ts         # Firebase 初期化
     ├── chat.ts             # チャット関連の関数・型
-    └── friends.ts          # 友達関連の関数・型
+    ├── friends.ts          # 友達関連の関数・型
+    └── profile.ts          # 友達削除・グループ退会の関数
 ```
 
 ### 設計の意図

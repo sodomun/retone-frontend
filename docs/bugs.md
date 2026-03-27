@@ -81,6 +81,71 @@ await updateDoc(
 
 ---
 
+## Bug 3：友達削除・グループ退会後に `permission-denied` が発生する
+
+### 症状
+
+- 友達削除またはグループ退会後、コンソールに以下のエラーが出る
+  ```
+  FirebaseError: [code=permission-denied]: Missing or insufficient permissions.
+  ```
+- 削除・退会自体は正常に完了している
+
+### 原因
+
+削除・退会の操作によって Firestore ドキュメントが変化し、既存の `onSnapshot` リスナーが発火する。
+
+**友達削除の場合：**
+チャットドキュメントが `deleteDoc` で消えると `resource` が `null` になる。
+ルール `request.auth.uid in resource.data.members` で `resource.data` へのアクセスが評価エラーとなり `permission-denied` が発生する。
+
+**グループ退会の場合：**
+`members` から自分が除外されたドキュメントの更新でリスナーが発火する。
+`resource.data.members` に自分が含まれないためルールが `false` を返し `permission-denied` になる。
+
+### 解決方法
+
+**友達削除（メッセージの残存問題も同時に修正）：**
+Firestore はドキュメントを削除してもサブコレクションは自動削除されない。1:1チャットの chatId は決定論的（同じ2人なら常に同じID）なため、メッセージを残したまま再度友達になると履歴が復元されてしまう。`writeBatch` でメッセージ・チャット・friends を一括削除するよう修正した。
+
+```typescript
+const messagesSnap = await getDocs(collection(db, "chats", chatId, "messages"));
+const batch = writeBatch(db);
+messagesSnap.docs.forEach((d) => batch.delete(d.ref));
+batch.delete(doc(db, "chats", chatId));
+batch.delete(doc(db, "users", myUid, "friends", friendUid));
+batch.delete(doc(db, "users", friendUid, "friends", myUid));
+await batch.commit();
+```
+
+**Firestore ルール修正：**
+`read` ルールに `resource == null` の場合も許可する条件を追加した。これによりドキュメントが削除された後もリスナーが削除イベントを正常に受け取れる。
+
+```js
+// 修正前
+allow read, update, delete: if request.auth != null
+  && request.auth.uid in resource.data.members;
+
+// 修正後
+allow read: if request.auth != null
+  && (resource == null || request.auth.uid in resource.data.members);
+allow update, delete: if request.auth != null
+  && request.auth.uid in resource.data.members;
+```
+
+**グループ退会（コード修正）：**
+`leaveGroup` 呼び出し前にリスナーを手動解除するよう修正した。
+
+```typescript
+unsubscribeChatRef.current?.(); // 操作前に解除
+await leaveGroup(chatId, user.uid);
+router.replace("/talk");
+```
+
+`router.replace` によるアンマウントを待つとリスナー解除が間に合わないため、明示的に先解除している。
+
+---
+
 ## Bug 2：`serverTimestamp()` のペンディング状態で値が `null` になる
 
 ### 症状

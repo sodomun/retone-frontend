@@ -152,14 +152,18 @@ service cloud.firestore {
     // friends
     match /users/{uid}/friends/{friendUid} {
       allow read: if request.auth.uid == uid;
-      // 友達追加は双方向書き込みのため、当事者2人のみ許可
+      // 友達追加・削除は双方向書き込みのため、当事者2人のみ許可
       allow write: if request.auth.uid == uid || request.auth.uid == friendUid;
     }
 
     // chats（1:1 + グループ共通）
     match /chats/{chatId} {
-      // 読み取り・更新・削除: 既存の members に自分が含まれる
-      allow read, update, delete: if request.auth != null
+      // read: ドキュメントが削除済み（resource == null）の場合も許可
+      //   → 削除・退会後にスナップショットリスナーが permission-denied にならないようにするため
+      allow read: if request.auth != null
+        && (resource == null || request.auth.uid in resource.data.members);
+      // 更新・削除: 既存の members に自分が含まれる
+      allow update, delete: if request.auth != null
         && request.auth.uid in resource.data.members;
       // 新規作成: 作成しようとしている members に自分が含まれる
       allow create: if request.auth != null
@@ -183,6 +187,15 @@ service cloud.firestore {
 | 1:1チャット | ✅ 動作する | ✅ 動作する |
 | グループチャット | ❌ 自動生成IDでは UID が取り出せない | ✅ 動作する |
 | コレクションクエリ | ❌ chatId が不定のため評価不可 | ✅ ドキュメントの中身で評価可能 |
+
+### read で resource == null を許可する理由
+
+友達削除（`deleteFriend`）やグループ退会（`leaveGroup`）の直後、スナップショットリスナーが発火する。
+
+- **友達削除時**：チャットドキュメントが `deleteDoc` で消えるため、`resource` が `null` になる。ルールが `resource.data.members` にアクセスしようとして評価エラー → `permission-denied`
+- **グループ退会時**：`members` から自分が除外されたドキュメントの更新がリスナーを発火させる。この時点でルールが `resource.data.members` を評価すると自分が含まれないため `permission-denied`
+
+退会時はコード側で操作前にリスナーを手動解除（`unsubscribeRef.current?.()`）して対処している。削除時は `resource == null` の場合も `read` を許可することで、リスナーが削除イベントを正常に受け取れるようにしている。
 
 ### create と update/delete を分ける理由
 

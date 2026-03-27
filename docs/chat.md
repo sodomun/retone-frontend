@@ -1,6 +1,7 @@
 # チャット機能の設計
 
 ## 関数一覧（src/lib/chat.ts）
+## プロフィール関連の関数（src/lib/profile.ts）
 
 ---
 
@@ -201,6 +202,63 @@ return ref.id;
 ```
 
 1:1チャットと異なり、`addDoc` で Firestore が自動生成した ID を chatId として使う。
+
+---
+
+## deleteFriend
+
+### 概要
+
+友達を双方向で削除し、1:1チャットドキュメントも削除する。`talk/[id]/profile/page.tsx` の「友達を削除する」ボタンから呼ばれる。
+
+```typescript
+await Promise.all([
+  deleteDoc(doc(db, "users", myUid, "friends", friendUid)),
+  deleteDoc(doc(db, "users", friendUid, "friends", myUid)), // 相手側も削除
+  deleteDoc(doc(db, "chats", getChatId(myUid, friendUid))),
+]);
+```
+
+- `addFriend` が双方向に書き込むのと対称的に、双方向で削除する
+- Firestore はドキュメントを削除してもサブコレクションは自動削除されない。1:1チャットの chatId は決定論的（同じ2人なら常に同じID）なため、メッセージを残したまま再度友達になると履歴が復元されてしまう。これを防ぐため `messages` サブコレクションも明示的に削除している
+- `writeBatch` でメッセージ削除・チャット削除・friends 削除をまとめてアトミックに実行する
+
+---
+
+## leaveGroup
+
+### 概要
+
+グループチャットから退会する。`talk/[id]/profile/page.tsx` の「退会する」ボタンから呼ばれる。
+
+```typescript
+const remaining = members.filter((uid) => uid !== myUid);
+
+if (remaining.length === 0) {
+  await deleteDoc(chatRef); // 最後の1人なら解散
+} else {
+  await updateDoc(chatRef, {
+    members: arrayRemove(myUid),
+    [`memberNames.${myUid}`]: deleteField(),
+  });
+}
+```
+
+- `members` 配列から自分の UID を除去
+- `memberNames` マップから自分のエントリを削除
+- 退会後に残りメンバーが 0 人になる場合はグループ自体を `deleteDoc` で解散する
+
+### なぜ退会前にリスナーを手動解除するのか
+
+`leaveGroup` でメンバーから自分が除外されると、`subscribeToChatData` のスナップショットが発火する。このとき `resource.data.members` に自分がいないため Firestore ルールで `permission-denied` になる。
+
+`router.replace("/talk")` によるコンポーネントのアンマウントはその後に行われるため、先にリスナーを手動解除することでエラーを防いでいる。
+
+```typescript
+unsubscribeChatRef.current?.(); // 先に解除
+await leaveGroup(chatId, user.uid);
+router.replace("/talk");
+```
 
 ---
 

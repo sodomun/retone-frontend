@@ -91,7 +91,7 @@ export default function ChatPage() {
         height: "100dvh",
       }}
     >
-      <ChatHeader displayName={headerTitle} />
+      <ChatHeader displayName={headerTitle} chatId={chatId} />
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
         {messages.map((msg) => (
           <MessageBubble

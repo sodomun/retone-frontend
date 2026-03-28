@@ -113,6 +113,30 @@ UID を入力して検索
   → displayName / email / uid / createdAt を表示
 ```
 
+### AI 設定
+```
+設定画面（/settings）内のAI設定セクション
+  → getSettings(uid) で settings/{uid} を取得
+  → aiEnabled トグルと systemPrompt テキストエリアを表示
+  → 変更時 → updateSettings(uid, { aiEnabled, systemPrompt })
+    → settings/{uid} を setDoc（ドキュメントが存在しない場合は作成）
+```
+
+### AI テキスト処理（受信者側・チャット画面）
+```
+チャット画面（/talk/[chatId]）を開く
+  → subscribeToMessages でメッセージ一覧を取得
+  → getSettings(uid) で自分のAI設定を取得
+  → aiEnabled: true の場合：
+      自分が受信者（senderUid !== myUid）のメッセージに対して：
+        aiTexts[myUid] が未生成なら：
+          adjustMessage(text, systemPrompt) → Gemini Flash 2.5 で調整
+          updateMessageAiText(chatId, messageId, myUid, aiText) で Firestore に保存
+  → MessageBubble に渡すテキストの決定：
+      isMine = true  → text（元テキスト）
+      isMine = false → aiTexts[myUid] があればそれ、なければ text
+```
+
 ---
 
 ## ディレクトリ構造
@@ -151,7 +175,9 @@ src/
     ├── firebase.ts         # Firebase 初期化
     ├── chat.ts             # チャット関連の関数・型
     ├── friends.ts          # 友達関連の関数・型（友達削除含む）
-    └── group.ts            # グループ関連の関数（グループ退会）
+    ├── group.ts            # グループ関連の関数（グループ退会）
+    ├── settings.ts         # AI設定の取得・更新（settings コレクション）
+    └── ai.ts               # Gemini Flash 2.5 API 呼び出し（テキスト調整）
 ```
 
 ### 設計の意図

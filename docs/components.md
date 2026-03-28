@@ -68,12 +68,26 @@ lastMessageAt（最後にメッセージが来た時刻）
 
 | Prop | 型 | 説明 |
 |------|-----|------|
-| text | string | メッセージ本文 |
+| text | string | 表示するメッセージ本文（親がaiText/textを選択して渡す） |
 | isMine | boolean | 自分が送ったメッセージかどうか |
 | createdAt | Date \| null | 送信時刻 |
 | readCount | number（省略可） | 既読人数（0 または未指定で非表示、1以上で表示） |
 | isGroup | boolean（省略可） | グループチャットかどうか（既読表示の形式に影響） |
 | displayName | string（省略可） | 送信者の名前（`chat.memberNames[msg.senderUid]` から取得） |
+| isAiAdjusted | boolean（省略可） | AI調整済みテキストを表示中かどうか（インジケーター表示に使用） |
+
+### AI テキストの選択ロジック（親コンポーネント側）
+
+```typescript
+// talk/[id]/page.tsx 内でどの text を MessageBubble に渡すかを決定
+const getDisplayText = (msg: Message): string => {
+  if (msg.senderUid === user.uid) return msg.text;              // 自分の送信 → 元テキスト
+  if (!aiEnabled) return msg.text;                              // AI無効 → 元テキスト
+  return msg.aiTexts?.[user.uid] ?? msg.text;                   // AI有効 → aiText（なければ元テキスト）
+};
+```
+
+MessageBubble 自体は渡された `text` をそのまま表示する。テキストの選択責任は親コンポーネントが持つ。
 
 ### 表示の振る舞い
 

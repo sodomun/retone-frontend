@@ -151,11 +151,24 @@ return onSnapshot(q, (snapshot) => {
     id: d.id,
     senderUid: data.senderUid,
     text: data.text,
+    aiTexts: data.aiTexts ?? {},   // 受信者UID → AI調整テキストのマップ
     createdAt:
       data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null,
   }));
   callback(messages);
 });
+```
+
+### Message 型
+
+```typescript
+type Message = {
+  id: string;
+  senderUid: string;
+  text: string;                          // 元のメッセージ本文
+  aiTexts: { [uid: string]: string };    // 受信者ごとのAI調整済みテキスト
+  createdAt: Date | null;
+};
 ```
 
 ### 注意点：createdAt が null になる瞬間がある

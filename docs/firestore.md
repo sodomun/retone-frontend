@@ -7,8 +7,10 @@ Firestore
 ├── users/{uid}                         # ユーザー情報
 │   └── friends/{friendUid}             # 友達一覧（サブコレクション）
 │
-└── chats/{chatId}                      # チャット情報（1:1・グループ共通）
-    └── messages/{messageId}            # メッセージ一覧（サブコレクション）
+├── chats/{chatId}                      # チャット情報（1:1・グループ共通）
+│   └── messages/{messageId}            # メッセージ一覧（サブコレクション）
+│
+└── settings/{uid}                      # ユーザーごとのAI設定（1ユーザー1ドキュメント）
 ```
 
 ---
@@ -89,8 +91,54 @@ memberNames: {
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | senderUid | string | 送信者の UID |
-| text | string | メッセージ本文 |
+| text | string | メッセージ本文（元テキスト。送信者が常に参照する） |
+| aiTexts | Map\<string, string\>（任意） | 受信者UID → AI調整済みテキストの対応表 |
 | createdAt | Timestamp | 送信時刻（サーバータイムスタンプ） |
+
+`aiTexts` の例：
+```
+aiTexts: {
+  "uid_B": "ちょっと確認したいことがあるんだけど、時間あるかな？",
+  "uid_C": "少しお時間よろしいでしょうか？",
+}
+```
+
+### なぜ aiTexts は受信者ごとのマップなのか
+
+受信者それぞれが独自の AI 設定（`systemPrompt`）を持つため、同じ元テキストでも受信者によって異なる調整結果になる。送信者は常に元の `text` を見る。受信者は自分の `aiTexts[myUid]` が存在すれば、それを表示する。
+
+### aiTexts の書き込みタイミング
+
+- 受信者がチャット画面を開いたとき（クライアント側でオンデマンド処理）
+- `aiEnabled: true` の場合のみ処理される
+- 一度書き込まれた `aiTexts[uid]` は再生成しない（Firestore コスト削減）
+
+---
+
+---
+
+## settings/{uid}
+
+ユーザーごとの AI 設定を格納する。ドキュメント ID はユーザーの UID と一致する（1ユーザー1ドキュメント）。
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| uid | string | ユーザーの UID |
+| aiEnabled | boolean | AI テキスト調整の有効/無効 |
+| systemPrompt | string | AI の振る舞いを指示するプロンプト文 |
+| updatedAt | Timestamp | 最終更新日時 |
+
+`systemPrompt` のデフォルト例：
+```
+以下のメッセージを、元の意図・内容を保ちながら、
+言葉のトゲや冷たい印象を取り除き、
+穏やかで受け取りやすい表現に書き直してください。
+書き直した文章のみを返してください。
+```
+
+### なぜ systemPrompt をユーザーが設定できるのか
+
+受け取りやすい表現の好みは人それぞれ。丁寧体が好きな人、フレンドリーな表現が好きな人、ビジネス調を好む人がいる。デフォルト文言を用意しつつ、ユーザーが自由にカスタマイズできる設計にすることで、各自のコミュニケーションスタイルに合わせた体験を提供できる。
 
 ---
 
@@ -174,6 +222,11 @@ service cloud.firestore {
         allow read, write: if request.auth != null
           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.members;
       }
+    }
+
+    // settings（AI設定）: 自分のドキュメントのみ読み書き可
+    match /settings/{uid} {
+      allow read, write: if request.auth.uid == uid;
     }
 
   }

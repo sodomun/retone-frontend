@@ -111,7 +111,7 @@ export default function AddMemberPage() {
         }}
       >
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push(`/talk/${chatId}/profile`)}
           style={{
             background: "none",
             border: "none",

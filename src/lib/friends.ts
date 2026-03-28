@@ -1,10 +1,12 @@
 import {
   doc,
   getDoc,
+  getDocs,
   setDoc,
   collection,
   onSnapshot,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getChatId } from "@/lib/chat";
@@ -61,6 +63,25 @@ export async function addFriend(
       { merge: true }
     ),
   ]);
+}
+
+/** 友達を両方向で削除し、ダイレクトチャット（メッセージ含む）も削除する */
+export async function deleteFriend(
+  myUid: string,
+  friendUid: string
+): Promise<void> {
+  const chatId = getChatId(myUid, friendUid);
+
+  const messagesSnap = await getDocs(
+    collection(db, "chats", chatId, "messages")
+  );
+
+  const batch = writeBatch(db);
+  messagesSnap.docs.forEach((d) => batch.delete(d.ref));
+  batch.delete(doc(db, "chats", chatId));
+  batch.delete(doc(db, "users", myUid, "friends", friendUid));
+  batch.delete(doc(db, "users", friendUid, "friends", myUid));
+  await batch.commit();
 }
 
 /** 友達一覧をリアルタイム取得する。unsubscribe関数を返す */

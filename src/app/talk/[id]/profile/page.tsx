@@ -6,7 +6,8 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeToChatData, Chat } from "@/lib/chat";
 import ProfileAvatar from "@/components/user/ProfileAvatar";
-import { deleteFriend, leaveGroup } from "@/lib/profile";
+import { deleteFriend } from "@/lib/friends";
+import { leaveGroup } from "@/lib/group";
 
 export default function ChatProfilePage() {
   const { id: chatId } = useParams<{ id: string }>();

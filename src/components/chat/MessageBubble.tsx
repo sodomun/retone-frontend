@@ -7,9 +7,10 @@ type Props = {
   readCount?: number;
   isGroup?: boolean;
   displayName?: string;
+  isAiAdjusted?: boolean;
 };
 
-export default function MessageBubble({ text, isMine, createdAt, readCount, isGroup, displayName }: Props) {
+export default function MessageBubble({ text, isMine, createdAt, readCount, isGroup, displayName, isAiAdjusted }: Props) {
   const timeStr = createdAt
     ? createdAt.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
     : "";
@@ -52,7 +53,7 @@ export default function MessageBubble({ text, isMine, createdAt, readCount, isGr
         >
           {text}
         </div>
-        <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+        <div style={{ display: "flex", gap: 4, marginTop: 2, alignItems: "center" }}>
           {isMine && !!readCount && (
             <span style={{ fontSize: 10, color: "var(--subtext-color)" }}>
               既読{isGroup ? readCount : ""}
@@ -60,6 +61,9 @@ export default function MessageBubble({ text, isMine, createdAt, readCount, isGr
           )}
           {timeStr && (
             <span style={{ fontSize: 10, color: "var(--timestamp-color)" }}>{timeStr}</span>
+          )}
+          {!isMine && isAiAdjusted && (
+            <span style={{ fontSize: 10, color: "#0084ff" }}>✦</span>
           )}
         </div>
       </div>

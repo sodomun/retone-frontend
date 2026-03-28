@@ -9,9 +9,12 @@ import {
   subscribeToMessages,
   subscribeToChatData,
   markAsRead,
+  updateMessageAiText,
   Message,
   Chat,
 } from "@/lib/chat";
+import { getSettings, UserSettings } from "@/lib/settings";
+import { adjustMessage } from "@/lib/ai";
 import ChatHeader from "@/components/chat/ChatHeader";
 import MessageBubble from "@/components/chat/MessageBubble";
 import MessageInput from "@/components/chat/MessageInput";
@@ -23,8 +26,11 @@ export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chat, setChat] = useState<Chat | null>(null);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // AI処理中のメッセージIDを追跡して重複呼び出しを防ぐ
+  const processingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -33,6 +39,7 @@ export default function ChatPage() {
         setLoading(false);
       } else {
         setUser(currentUser);
+        getSettings(currentUser.uid).then(setSettings);
       }
     });
     return () => unsubscribe();
@@ -52,6 +59,31 @@ export default function ChatPage() {
     if (!user || !chatId) return;
     return subscribeToChatData(chatId, setChat);
   }, [user, chatId]);
+
+  // AI処理: 受信メッセージのうち aiTexts[myUid] が未生成のものを処理する
+  useEffect(() => {
+    if (!user || !chatId || !settings?.aiEnabled) return;
+
+    const unprocessed = messages.filter(
+      (msg) =>
+        msg.senderUid !== user.uid &&
+        !msg.aiTexts[user.uid] &&
+        !processingRef.current.has(msg.id)
+    );
+
+    unprocessed.forEach((msg) => {
+      processingRef.current.add(msg.id);
+      adjustMessage(msg.text, settings.systemPrompt)
+        .then((aiText) => {
+          if (aiText) {
+            updateMessageAiText(chatId, msg.id, user.uid, aiText);
+          }
+        })
+        .finally(() => {
+          processingRef.current.delete(msg.id);
+        });
+    });
+  }, [messages, settings, user, chatId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,6 +132,13 @@ export default function ChatPage() {
     ? (chat?.name ?? "グループ")
     : (chat?.memberNames?.[partnerUid] ?? chatId);
 
+  // 送信者は元テキスト、受信者はAI調整済みテキスト（なければ元テキスト）を表示する
+  const getDisplayText = (msg: Message): string => {
+    if (msg.senderUid === user.uid) return msg.text;
+    if (!settings?.aiEnabled) return msg.text;
+    return msg.aiTexts[user.uid] ?? msg.text;
+  };
+
   return (
     <div
       style={{
@@ -116,13 +155,18 @@ export default function ChatPage() {
         {messages.map((msg) => (
           <MessageBubble
             key={msg.id}
-            text={msg.text}
+            text={getDisplayText(msg)}
             isMine={msg.senderUid === user.uid}
             createdAt={msg.createdAt}
             readCount={getReadCount(msg)}
             isGroup={isGroup}
             // memberNames からメッセージ送信者の名前を取得（グループでは送信者ごとに異なる）
             displayName={chat?.memberNames?.[msg.senderUid] ?? ""}
+            isAiAdjusted={
+              msg.senderUid !== user.uid &&
+              !!settings?.aiEnabled &&
+              !!msg.aiTexts[user.uid]
+            }
           />
         ))}
         <div ref={bottomRef} />

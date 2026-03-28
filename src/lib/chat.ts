@@ -18,6 +18,7 @@ export type Message = {
   id: string;
   senderUid: string;
   text: string;
+  aiTexts: Record<string, string>;
   createdAt: Date | null;
 };
 
@@ -134,6 +135,18 @@ export async function addMembersToGroup(
   });
 }
 
+/** AI調整済みテキストをメッセージドキュメントの aiTexts に書き込む */
+export async function updateMessageAiText(
+  chatId: string,
+  messageId: string,
+  uid: string,
+  aiText: string
+): Promise<void> {
+  await updateDoc(doc(db, "chats", chatId, "messages", messageId), {
+    [`aiTexts.${uid}`]: aiText,
+  });
+}
+
 /** メッセージをリアルタイム取得する。unsubscribe関数を返す */
 export function subscribeToMessages(
   chatId: string,
@@ -148,6 +161,7 @@ export function subscribeToMessages(
         id: d.id,
         senderUid: data.senderUid,
         text: data.text,
+        aiTexts: data.aiTexts ?? {},
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null,
       };
     });

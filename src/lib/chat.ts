@@ -31,6 +31,7 @@ export type Chat = {
   lastMessageAt?: Timestamp;
   lastMessageSenderId?: string;
   readBy?: Record<string, Timestamp>;
+  lastAiMessages?: Record<string, string>;
 };
 
 export type ChatWithId = Chat & { id: string };
@@ -132,6 +133,17 @@ export async function addMembersToGroup(
   await updateDoc(doc(db, "chats", chatId), {
     members: arrayUnion(...newUids),
     ...namesUpdate,
+  });
+}
+
+/** チャットドキュメントの lastAiMessages に受信者ごとのAI調整済みテキストを書き込む */
+export async function updateChatLastAiMessage(
+  chatId: string,
+  uid: string,
+  aiText: string
+): Promise<void> {
+  await updateDoc(doc(db, "chats", chatId), {
+    [`lastAiMessages.${uid}`]: aiText,
   });
 }
 

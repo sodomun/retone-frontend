@@ -10,6 +10,7 @@ import {
   subscribeToChatData,
   markAsRead,
   updateMessageAiText,
+  updateChatLastAiMessage,
   Message,
   Chat,
 } from "@/lib/chat";
@@ -20,13 +21,14 @@ import MessageBubble from "@/components/chat/MessageBubble";
 import MessageInput from "@/components/chat/MessageInput";
 
 export default function ChatPage() {
-  // URLパラメータは 1:1・グループ共通で chatId
   const { id: chatId } = useParams<{ id: string }>();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chat, setChat] = useState<Chat | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  // チャット画面を開いた時点の readBy[myUid]（markAsRead で上書きされる前の値）
+  const [initialReadAtMs, setInitialReadAtMs] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   // AI処理中のメッセージIDを追跡して重複呼び出しを防ぐ
@@ -57,33 +59,53 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!user || !chatId) return;
-    return subscribeToChatData(chatId, setChat);
+    return subscribeToChatData(chatId, (chatData) => {
+      // 初回のみ readBy[myUid] を保存する。
+      // markAsRead が書き込む前の値が「既読済みの基準時刻」になる。
+      setInitialReadAtMs((prev) => {
+        if (prev === null) {
+          return chatData?.readBy?.[user.uid]?.toMillis() ?? 0;
+        }
+        return prev;
+      });
+      setChat(chatData);
+    });
   }, [user, chatId]);
 
-  // AI処理: 受信メッセージのうち aiTexts[myUid] が未生成のものを処理する
+  // AI処理: 未読かつ aiTexts[myUid] が未生成のメッセージのみ処理する
   useEffect(() => {
-    if (!user || !chatId || !settings?.aiEnabled) return;
+    if (!user || !chatId || !settings?.aiEnabled || initialReadAtMs === null) return;
 
     const unprocessed = messages.filter(
       (msg) =>
         msg.senderUid !== user.uid &&
         !msg.aiTexts[user.uid] &&
-        !processingRef.current.has(msg.id)
+        !processingRef.current.has(msg.id) &&
+        // 未読判定: 画面を開いた時点の既読タイムスタンプより新しいメッセージのみ
+        (msg.createdAt?.getTime() ?? 0) > initialReadAtMs
     );
+
+    if (unprocessed.length === 0) return;
+
+    // messages は createdAt 昇順なので、最後の要素がチャットの最新メッセージ
+    const lastUnprocessedId = unprocessed[unprocessed.length - 1].id;
 
     unprocessed.forEach((msg) => {
       processingRef.current.add(msg.id);
       adjustMessage(msg.text, settings.systemPrompt)
         .then((aiText) => {
-          if (aiText) {
-            updateMessageAiText(chatId, msg.id, user.uid, aiText);
+          if (!aiText) return;
+          updateMessageAiText(chatId, msg.id, user.uid, aiText);
+          // 最新メッセージなら一覧プレビュー用の lastAiMessages も更新する
+          if (msg.id === lastUnprocessedId) {
+            updateChatLastAiMessage(chatId, user.uid, aiText);
           }
         })
         .finally(() => {
           processingRef.current.delete(msg.id);
         });
     });
-  }, [messages, settings, user, chatId]);
+  }, [messages, settings, user, chatId, initialReadAtMs]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -99,7 +121,6 @@ export default function ChatPage() {
 
   const isGroup = chat?.type === "group";
 
-  // 1:1チャットの場合のみ相手の既読タイムスタンプを取得
   const partnerUid = !isGroup
     ? (chat?.members?.find((uid) => uid !== user.uid) ?? "")
     : "";
@@ -127,16 +148,27 @@ export default function ChatPage() {
       }).length;
   };
 
-  // ヘッダーに表示する名前
   const headerTitle = isGroup
     ? (chat?.name ?? "グループ")
     : (chat?.memberNames?.[partnerUid] ?? chatId);
 
-  // 送信者は元テキスト、受信者はAI調整済みテキスト（なければ元テキスト）を表示する
-  const getDisplayText = (msg: Message): string => {
+  /**
+   * 表示するテキストを決定する。
+   * null を返した場合はメッセージを非表示にする（未読 & AI処理待ち）。
+   */
+  const getDisplayText = (msg: Message): string | null => {
     if (msg.senderUid === user.uid) return msg.text;
     if (!settings?.aiEnabled) return msg.text;
-    return msg.aiTexts[user.uid] ?? msg.text;
+
+    const aiText = msg.aiTexts[user.uid];
+    if (aiText) return aiText;
+
+    // 未読メッセージかつ AI 未処理 → 秘匿のため非表示
+    const msgTime = msg.createdAt?.getTime() ?? 0;
+    if (msgTime > (initialReadAtMs ?? 0)) return null;
+
+    // 既読済みで AI 未処理（処理対象外）→ 原文を表示
+    return msg.text;
   };
 
   return (
@@ -152,23 +184,26 @@ export default function ChatPage() {
     >
       <ChatHeader displayName={headerTitle} chatId={chatId} />
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            text={getDisplayText(msg)}
-            isMine={msg.senderUid === user.uid}
-            createdAt={msg.createdAt}
-            readCount={getReadCount(msg)}
-            isGroup={isGroup}
-            // memberNames からメッセージ送信者の名前を取得（グループでは送信者ごとに異なる）
-            displayName={chat?.memberNames?.[msg.senderUid] ?? ""}
-            isAiAdjusted={
-              msg.senderUid !== user.uid &&
-              !!settings?.aiEnabled &&
-              !!msg.aiTexts[user.uid]
-            }
-          />
-        ))}
+        {messages.map((msg) => {
+          const displayText = getDisplayText(msg);
+          if (displayText === null) return null;
+          return (
+            <MessageBubble
+              key={msg.id}
+              text={displayText}
+              isMine={msg.senderUid === user.uid}
+              createdAt={msg.createdAt}
+              readCount={getReadCount(msg)}
+              isGroup={isGroup}
+              displayName={chat?.memberNames?.[msg.senderUid] ?? ""}
+              isAiAdjusted={
+                msg.senderUid !== user.uid &&
+                !!settings?.aiEnabled &&
+                !!msg.aiTexts[user.uid]
+              }
+            />
+          );
+        })}
         <div ref={bottomRef} />
       </div>
       <MessageInput onSend={handleSend} />

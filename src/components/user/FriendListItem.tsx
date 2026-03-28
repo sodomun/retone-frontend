@@ -8,17 +8,27 @@ type Props = {
   myUid: string;
   chat: Chat | null;
   isGroup?: boolean;
+  aiEnabled?: boolean;
   onClick?: () => void;
 };
 
-export default function FriendListItem({ displayName, myUid, chat, isGroup = false, onClick }: Props) {
+export default function FriendListItem({ displayName, myUid, chat, isGroup = false, aiEnabled = false, onClick }: Props) {
   const isUnread = (() => {
     if (!chat?.lastMessageAt) return false;
     const readAtMs = chat.readBy?.[myUid]?.toMillis() ?? 0;
     return chat.lastMessageAt.toMillis() > readAtMs;
   })();
 
-  const lastMessageText = chat?.lastMessage ?? "メッセージがありません。";
+  const lastMessageText = (() => {
+    if (!chat?.lastMessage) return "メッセージがありません。";
+    // AI有効 かつ 最後のメッセージが相手から送られた場合
+    if (aiEnabled && chat.lastMessageSenderId !== myUid) {
+      const aiText = chat.lastAiMessages?.[myUid];
+      if (aiText) return aiText;  // AI調整済みテキストを表示
+      return "";                   // 未処理の場合は原文を秘匿
+    }
+    return chat.lastMessage;
+  })();
 
   const lastMessageTimeStr = (() => {
     if (!chat?.lastMessageAt) return "";

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeToChats, ChatWithId } from "@/lib/chat";
+import { getSettings } from "@/lib/settings";
 import TalkHeader from "@/components/talk/TalkHeader";
 import FriendListItem from "@/components/user/FriendListItem";
 import Footer from "@/components/common/Footer";
@@ -13,6 +14,7 @@ export default function TalkPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [chats, setChats] = useState<ChatWithId[]>([]);
+  const [aiEnabled, setAiEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,6 +23,7 @@ export default function TalkPage() {
         router.replace("/login");
       } else {
         setUser(currentUser);
+        getSettings(currentUser.uid).then((s) => setAiEnabled(s?.aiEnabled ?? false));
       }
       setLoading(false);
     });
@@ -70,6 +73,7 @@ export default function TalkPage() {
                 myUid={user.uid}
                 chat={chat}
                 isGroup={isGroup}
+                aiEnabled={aiEnabled}
                 onClick={() => router.push(`/talk/${chat.id}`)}
               />
             );

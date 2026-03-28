@@ -25,7 +25,12 @@ export default function MessageBubble({ text, isMine, createdAt, readCount, isGr
       }}
     >
       {!isMine && (
-        <ProfileAvatar displayName={displayName || "?"} size={32} />
+        <>
+          <span style={{ fontSize: 12, color: "var(--subtext-color)", flexShrink: 0 }}>
+            {displayName}
+          </span>
+          <ProfileAvatar displayName={displayName || "?"} size={32} />
+        </>
       )}
       <div
         style={{

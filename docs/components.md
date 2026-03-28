@@ -71,26 +71,51 @@ lastMessageAt（最後にメッセージが来た時刻）
 | text | string | メッセージ本文 |
 | isMine | boolean | 自分が送ったメッセージかどうか |
 | createdAt | Date \| null | 送信時刻 |
-| isRead | boolean（省略可） | 既読マークを表示するかどうか（1:1のみ） |
+| readCount | number（省略可） | 既読人数（0 または未指定で非表示、1以上で表示） |
+| isGroup | boolean（省略可） | グループチャットかどうか（既読表示の形式に影響） |
 | displayName | string（省略可） | 送信者の名前（`chat.memberNames[msg.senderUid]` から取得） |
 
 ### 表示の振る舞い
 
 ```
 相手のメッセージ（isMine = false）
-  [アバター] [グレーのバブル]
-  ← 左寄せ。アバターは ProfileAvatar（32px）
-  グループでは送信者ごとに異なる名前のアバターが表示される
+  表示名  [アバター] [グレーのバブル]
+  ← 左寄せ。アバター左横に送信者名を表示。アバターは ProfileAvatar（32px）
 
 自分のメッセージ（isMine = true）
-             [青いバブル]
-             既読  12:34
-  → 右寄せ。isRead = true のとき「既読」テキストを表示（1:1のみ）
+                      [青いバブル]
+  1:1:   既読  12:34
+  グループ: 既読3  12:34
+  → 右寄せ。readCount >= 1 のとき既読テキストを表示
+  → 1:1は「既読」、グループは「既読n」（n = 既読人数）
+```
+
+### 既読表示ロジック
+
+```typescript
+// readCount の計算（talk/[id]/page.tsx 内）
+const getReadCount = (msg: Message): number => {
+  if (msg.senderUid !== user.uid) return 0; // 自分のメッセージのみ対象
+
+  if (!isGroup) {
+    // 1:1: 相手の readBy タイムスタンプとメッセージの createdAt を比較
+    return partnerReadAtMs > 0 &&
+      (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs ? 1 : 0;
+  }
+
+  // グループ: 自分以外のメンバーで readBy >= createdAt を満たす人数を数える
+  return (chat?.members ?? [])
+    .filter((uid) => uid !== user.uid)
+    .filter((uid) => {
+      const readAtMs = chat?.readBy?.[uid]?.toMillis();
+      return readAtMs != null && readAtMs >= msgTimeMs;
+    }).length;
+};
 ```
 
 ### なぜ自分のメッセージにしか既読を表示しないのか
 
-「既読」とは「相手が自分のメッセージを読んだ」という情報であり、相手のメッセージに対しては意味をなさないため。またグループチャットでは複数人の既読状態を1つの表示にまとめることが複雑なため、現状は非表示としている。
+「既読」とは「相手が自分のメッセージを読んだ」という情報であり、相手のメッセージに対しては意味をなさないため。
 
 ---
 

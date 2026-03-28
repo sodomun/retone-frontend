@@ -49,7 +49,7 @@ UID を入力して検索
   → sendMessage でメッセージ送信
 
 1:1の場合: memberNames[partnerUid] でヘッダーの名前を取得
-グループの場合: chat.name でヘッダーの名前を取得、既読表示なし
+グループの場合: chat.name でヘッダーの名前を取得、既読n（既読人数）を表示
 ```
 
 ### グループ作成
@@ -81,11 +81,22 @@ UID を入力して検索
 
 グループの場合:
   → グループ名・アバター・メンバー数を表示
+  → 「グループに友達追加」→ /talk/{chatId}/add-member に遷移
   → 「退会する」→ leaveGroup()
     - members から自分の UID を arrayRemove
     - memberNames から自分のエントリを deleteField
     - 残りメンバーが 0 人なら chats/{chatId} ごと deleteDoc
   → /talk にリダイレクト
+
+グループへの友達追加:
+  /talk/{chatId}/add-member
+  → subscribeToFriends で友達一覧を取得
+  → subscribeToChats で各友達の 1:1 チャット情報を取得（lastMessageAt ソート用）
+  → chat.members に含まれない友達のみ表示（lastMessageAt 降順）
+  → トグルで複数選択 → 「追加」→ addMembersToGroup()
+    - members に arrayUnion で新メンバーを追加
+    - memberNames に新メンバーの displayName を追加
+  → /talk/{chatId} にリダイレクト
 ```
 
 ### 設定
@@ -113,7 +124,8 @@ src/
 │   ├── signup/             # 新規登録ページ
 │   ├── talk/               # トーク一覧ページ
 │   │   ├── [id]/           # チャットページ（chatId が動的パラメータ）
-│   │   │   └── profile/    # チャット相手 or グループのプロフィールページ
+│   │   │   ├── profile/    # チャット相手 or グループのプロフィールページ
+│   │   │   └── add-member/ # グループへの友達追加ページ
 │   │   └── new-group/      # グループ作成：友達選択
 │   │       └── profile/    # グループ作成：プロフィール設定
 │   ├── friends/add/        # 友達追加ページ
@@ -138,8 +150,8 @@ src/
 └── lib/                    # Firebase 操作・ビジネスロジック
     ├── firebase.ts         # Firebase 初期化
     ├── chat.ts             # チャット関連の関数・型
-    ├── friends.ts          # 友達関連の関数・型
-    └── profile.ts          # 友達削除・グループ退会の関数
+    ├── friends.ts          # 友達関連の関数・型（友達削除含む）
+    └── group.ts            # グループ関連の関数（グループ退会）
 ```
 
 ### 設計の意図

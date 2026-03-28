@@ -124,10 +124,26 @@ export default function ChatProfilePage() {
           </p>
 
           <button
+            onClick={() => router.push(`/talk/${chatId}/add-member`)}
+            style={{
+              marginTop: 32,
+              padding: "12px 32px",
+              borderRadius: 10,
+              border: "1.5px solid var(--border-color)",
+              background: "var(--input-bg)",
+              color: "var(--foreground)",
+              fontWeight: "bold",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            グループに友達追加
+          </button>
+          <button
             onClick={handleLeave}
             disabled={submitting}
             style={{
-              marginTop: 32,
+              marginTop: 12,
               padding: "12px 32px",
               borderRadius: 10,
               border: "none",

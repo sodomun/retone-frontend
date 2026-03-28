@@ -10,6 +10,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -116,6 +117,21 @@ export async function createGroupChat(
     lastMessageAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+/** 既存グループに新メンバーを追加する */
+export async function addMembersToGroup(
+  chatId: string,
+  newUids: string[],
+  newMemberNames: Record<string, string>
+): Promise<void> {
+  const namesUpdate = Object.fromEntries(
+    newUids.map((uid) => [`memberNames.${uid}`, newMemberNames[uid]])
+  );
+  await updateDoc(doc(db, "chats", chatId), {
+    members: arrayUnion(...newUids),
+    ...namesUpdate,
+  });
 }
 
 /** メッセージをリアルタイム取得する。unsubscribe関数を返す */

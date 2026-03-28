@@ -1,7 +1,9 @@
 # チャット機能の設計
 
-## 関数一覧（src/lib/chat.ts）
-## プロフィール関連の関数（src/lib/profile.ts）
+## 関数一覧
+- チャット関連: `src/lib/chat.ts`（sendMessage, markAsRead, subscribeToMessages, subscribeToChatData, subscribeToChats, createGroupChat, addMembersToGroup）
+- 友達関連: `src/lib/friends.ts`（addFriend, deleteFriend, subscribeToFriends）
+- グループ関連: `src/lib/group.ts`（leaveGroup）
 
 ---
 
@@ -205,11 +207,31 @@ return ref.id;
 
 ---
 
+## addMembersToGroup
+
+### 概要
+
+既存のグループに新メンバーを追加する。`talk/[id]/add-member/page.tsx` の「追加」ボタンから呼ばれる。
+
+```typescript
+await updateDoc(doc(db, "chats", chatId), {
+  members: arrayUnion(...newUids),         // 配列に新メンバーを追加（重複なし）
+  ...Object.fromEntries(
+    newUids.map((uid) => [`memberNames.${uid}`, newMemberNames[uid]])
+  ),                                        // memberNames に新メンバーの表示名を追加
+});
+```
+
+- `arrayUnion` により既存メンバーを変更せず新メンバーのみ追加される
+- `memberNames` はドット記法で個別フィールドとして更新されるため、既存メンバーの名前は上書きされない
+
+---
+
 ## deleteFriend
 
 ### 概要
 
-友達を双方向で削除し、1:1チャットドキュメントも削除する。`talk/[id]/profile/page.tsx` の「友達を削除する」ボタンから呼ばれる。
+友達を双方向で削除し、1:1チャットドキュメントも削除する。`talk/[id]/profile/page.tsx` の「友達を削除する」ボタンから呼ばれる。`src/lib/friends.ts` に定義。
 
 ```typescript
 await Promise.all([
@@ -229,7 +251,7 @@ await Promise.all([
 
 ### 概要
 
-グループチャットから退会する。`talk/[id]/profile/page.tsx` の「退会する」ボタンから呼ばれる。
+グループチャットから退会する。`talk/[id]/profile/page.tsx` の「退会する」ボタンから呼ばれる。`src/lib/group.ts` に定義。
 
 ```typescript
 const remaining = members.filter((uid) => uid !== myUid);
@@ -264,35 +286,47 @@ router.replace("/talk");
 
 ## 既読判定ロジック
 
-### 各メッセージに既読マークをつける（チャット画面）
+### 各メッセージに既読人数をつける（チャット画面）
 
-1:1チャットのみ。グループチャットでは `isRead` は常に `false`。
+`readCount` として既読人数を計算し `MessageBubble` に渡す。1:1では 0 or 1、グループでは 0〜n。
 
 ```typescript
-const isGroup = chat?.type === "group";
-const partnerUid = !isGroup
-  ? (chat?.members?.find((uid) => uid !== user.uid) ?? "")
-  : "";
-const partnerReadAtMs = !isGroup
-  ? (chat?.readBy?.[partnerUid]?.toMillis() ?? 0)
-  : 0;
+const getReadCount = (msg: Message): number => {
+  if (msg.senderUid !== user.uid) return 0; // 自分のメッセージのみ対象
 
-isRead={
-  !isGroup &&
-  msg.senderUid === user.uid &&
-  partnerReadAtMs > 0 &&
-  (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
-}
+  if (!isGroup) {
+    // 1:1: 相手の readBy タイムスタンプとメッセージの createdAt を比較
+    return partnerReadAtMs > 0 &&
+      (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs ? 1 : 0;
+  }
+
+  // グループ: 自分以外のメンバーで readBy >= createdAt を満たす人数
+  const msgTimeMs = msg.createdAt?.getTime();
+  if (msgTimeMs == null) return 0;
+
+  return (chat?.members ?? [])
+    .filter((uid) => uid !== user.uid)
+    .filter((uid) => {
+      const readAtMs = chat?.readBy?.[uid]?.toMillis();
+      return readAtMs != null && readAtMs >= msgTimeMs;
+    }).length;
+};
 ```
 
 **考え方：**
 
-- `partnerReadAtMs`：相手が最後にチャット画面を開いた時刻（ミリ秒）
-- 以下の条件をすべて満たすメッセージに「既読」を表示する
-  1. グループチャットでない
-  2. 自分が送ったメッセージ
-  3. 相手が一度でもチャットを開いている（`partnerReadAtMs > 0`）
-  4. 相手が開いた時刻以前に送ったもの（`createdAt <= partnerReadAtMs`）
+- `readBy[uid]`：各ユーザーが最後にチャット画面を開いた時刻
+- あるメッセージを「読んだ」= `readBy[uid] >= msg.createdAt`
+- 1:1は相手1人だけ、グループは自分以外の全メンバーを対象にカウント
 
 **`Infinity` を使う理由：**
-`createdAt` が `null`（送信直後で時刻未確定）のメッセージは `Infinity` 扱いにして、条件4を満たさないよう除外する。
+`createdAt` が `null`（送信直後で時刻未確定）のメッセージは `Infinity` 扱いにして、既読条件を満たさないよう除外する。
+
+### MessageBubble での表示
+
+| 状況 | readCount | 表示 |
+|---|---|---|
+| 1:1・未読 | 0 | 非表示 |
+| 1:1・既読 | 1 | 「既読」 |
+| グループ・誰も未読 | 0 | 非表示 |
+| グループ・3人既読 | 3 | 「既読3」 |

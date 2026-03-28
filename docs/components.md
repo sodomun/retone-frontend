@@ -143,6 +143,7 @@ const getReadCount = (msg: Message): number => {
 - `talk/new-group/page.tsx`：グループ作成の友達選択画面
 - `talk/new-group/profile/page.tsx`：グループプロフィール設定のメンバー一覧（48px）
 - `talk/[id]/profile/page.tsx`：1:1プロフィール画面（80px）
+- `talk/[id]/add-member/page.tsx`：グループへの友達追加画面（FriendListItem 経由）
 
 ---
 

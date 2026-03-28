@@ -67,13 +67,33 @@ export default function ChatPage() {
 
   const isGroup = chat?.type === "group";
 
-  // 1:1チャットの場合のみ既読情報を計算
+  // 1:1チャットの場合のみ相手の既読タイムスタンプを取得
   const partnerUid = !isGroup
     ? (chat?.members?.find((uid) => uid !== user.uid) ?? "")
     : "";
   const partnerReadAtMs = !isGroup
     ? (chat?.readBy?.[partnerUid]?.toMillis() ?? 0)
     : 0;
+
+  const getReadCount = (msg: Message): number => {
+    if (msg.senderUid !== user.uid) return 0;
+
+    if (!isGroup) {
+      return partnerReadAtMs > 0 &&
+        (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
+        ? 1 : 0;
+    }
+
+    const msgTimeMs = msg.createdAt?.getTime();
+    if (msgTimeMs == null) return 0;
+
+    return (chat?.members ?? [])
+      .filter((uid) => uid !== user.uid)
+      .filter((uid) => {
+        const readAtMs = chat?.readBy?.[uid]?.toMillis();
+        return readAtMs != null && readAtMs >= msgTimeMs;
+      }).length;
+  };
 
   // ヘッダーに表示する名前
   const headerTitle = isGroup
@@ -99,12 +119,8 @@ export default function ChatPage() {
             text={msg.text}
             isMine={msg.senderUid === user.uid}
             createdAt={msg.createdAt}
-            isRead={
-              !isGroup &&
-              msg.senderUid === user.uid &&
-              partnerReadAtMs > 0 &&
-              (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
-            }
+            readCount={getReadCount(msg)}
+            isGroup={isGroup}
             // memberNames からメッセージ送信者の名前を取得（グループでは送信者ごとに異なる）
             displayName={chat?.memberNames?.[msg.senderUid] ?? ""}
           />

@@ -4,11 +4,12 @@ type Props = {
   text: string;
   isMine: boolean;
   createdAt: Date | null;
-  isRead?: boolean;
+  readCount?: number;
+  isGroup?: boolean;
   displayName?: string;
 };
 
-export default function MessageBubble({ text, isMine, createdAt, isRead, displayName }: Props) {
+export default function MessageBubble({ text, isMine, createdAt, readCount, isGroup, displayName }: Props) {
   const timeStr = createdAt
     ? createdAt.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
     : "";
@@ -47,8 +48,10 @@ export default function MessageBubble({ text, isMine, createdAt, isRead, display
           {text}
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
-          {isMine && isRead && (
-            <span style={{ fontSize: 10, color: "var(--subtext-color)" }}>既読</span>
+          {isMine && !!readCount && (
+            <span style={{ fontSize: 10, color: "var(--subtext-color)" }}>
+              既読{isGroup ? readCount : ""}
+            </span>
           )}
           {timeStr && (
             <span style={{ fontSize: 10, color: "var(--timestamp-color)" }}>{timeStr}</span>

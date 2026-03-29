@@ -113,6 +113,8 @@ type UserSettings = {
 
 ## aiText 生成フロー（チャット画面）
 
+AI 処理のロジックは `hooks/useAiProcessing.ts` に分離されている。`talk/[id]/page.tsx` は `useAiProcessing(messages, settings, user?.uid, chatId, initialReadAtMs)` を呼ぶだけで、副作用（Gemini API 呼び出し・Firestore 書き込み）はフック内で完結する。
+
 ### 前提：未読メッセージのみ処理する
 
 全メッセージを処理すると API コストが高くなる。また、過去に生成した aiText を設定変更で上書きしてしまう問題も生じる。そのため **未読メッセージのみ** を処理対象とする。
@@ -280,10 +282,11 @@ AI テキスト調整
 ### Phase 2 — AI API 接続 & メッセージ処理 ✅
 - `app/api/adjust-message/route.ts` 実装（Gemini API プロキシ）
 - `lib/ai.ts` 実装（`adjustMessage`）
-- `lib/chat.ts` に `updateMessageAiText` / `updateChatLastAiMessage` を追加
+- `lib/chat.ts` に `updateMessageAiText` / `updateChatLastAiMessage` / `getReadCount` / `getDisplayText` を追加
 - `Message` 型に `aiTexts`、`Chat` 型に `lastAiMessages` を追加
-- `talk/[id]/page.tsx` に AI 処理ロジックを組み込む（未読のみ・非表示待機）
-- `talk/page.tsx` に settings ロードを追加
+- `hooks/useAiProcessing.ts` 実装（未読メッセージの AI 処理・副作用のみ）
+- `hooks/useAuth.ts` で settings ロードを統合（`talk/[id]/page.tsx` が `useAuth` 経由で settings を受け取る）
+- `talk/page.tsx` に `useAuth` 経由での settings ロードを追加
 - `FriendListItem` に `aiEnabled` props 追加・プレビュー表示ロジック更新
 - `MessageBubble` に `isAiAdjusted` props 追加（✦ インジケーター）
 

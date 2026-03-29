@@ -290,7 +290,7 @@ if (remaining.length === 0) {
 `router.replace("/talk")` によるコンポーネントのアンマウントはその後に行われるため、先にリスナーを手動解除することでエラーを防いでいる。
 
 ```typescript
-unsubscribeChatRef.current?.(); // 先に解除
+unsubscribe(); // 先に解除（useChatData が返す関数）
 await leaveGroup(chatId, user.uid);
 router.replace("/talk");
 ```
@@ -303,9 +303,18 @@ router.replace("/talk");
 
 `readCount` として既読人数を計算し `MessageBubble` に渡す。1:1では 0 or 1、グループでは 0〜n。
 
+`lib/chat.ts` の `getReadCount` として定義されている純粋関数。
+
 ```typescript
-const getReadCount = (msg: Message): number => {
-  if (msg.senderUid !== user.uid) return 0; // 自分のメッセージのみ対象
+// lib/chat.ts
+export function getReadCount(
+  msg: Message,
+  userId: string,
+  isGroup: boolean,
+  chat: Chat | null,
+  partnerReadAtMs: number
+): number {
+  if (msg.senderUid !== userId) return 0; // 自分のメッセージのみ対象
 
   if (!isGroup) {
     // 1:1: 相手の readBy タイムスタンプとメッセージの createdAt を比較
@@ -318,12 +327,12 @@ const getReadCount = (msg: Message): number => {
   if (msgTimeMs == null) return 0;
 
   return (chat?.members ?? [])
-    .filter((uid) => uid !== user.uid)
+    .filter((uid) => uid !== userId)
     .filter((uid) => {
       const readAtMs = chat?.readBy?.[uid]?.toMillis();
       return readAtMs != null && readAtMs >= msgTimeMs;
     }).length;
-};
+}
 ```
 
 **考え方：**
@@ -343,3 +352,28 @@ const getReadCount = (msg: Message): number => {
 | 1:1・既読 | 1 | 「既読」 |
 | グループ・誰も未読 | 0 | 非表示 |
 | グループ・3人既読 | 3 | 「既読3」 |
+
+---
+
+## 表示テキスト決定ロジック（getDisplayText）
+
+`lib/chat.ts` の `getDisplayText` として定義されている純粋関数。チャット画面でどのテキストを `MessageBubble` に渡すかを決定する。
+
+```typescript
+export function getDisplayText(
+  msg: Message,
+  userId: string,
+  settings: UserSettings | null,
+  initialReadAtMs: number | null
+): string | null
+```
+
+| 条件 | 返す値 |
+|---|---|
+| 自分のメッセージ | `text`（原文） |
+| 相手のメッセージ & AI 無効 | `text`（原文） |
+| 相手のメッセージ & AI 有効 & `aiTexts[uid]` あり | `aiTexts[uid]`（AI 調整済み） |
+| 相手のメッセージ & AI 有効 & 未処理 & 未読 | `null`（非表示） |
+| 相手のメッセージ & AI 有効 & 未処理 & 既読済み | `text`（原文） |
+
+`null` を返すと `talk/[id]/page.tsx` 側で `MessageBubble` のレンダリングをスキップし、AI 処理完了前に原文が一瞬表示されるのを防ぐ。

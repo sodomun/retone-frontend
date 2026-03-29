@@ -137,12 +137,12 @@ allow update, delete: if request.auth != null
 `leaveGroup` 呼び出し前にリスナーを手動解除するよう修正した。
 
 ```typescript
-unsubscribeChatRef.current?.(); // 操作前に解除
+unsubscribe(); // 操作前に解除（useChatData が返す関数）
 await leaveGroup(chatId, user.uid);
 router.replace("/talk");
 ```
 
-`router.replace` によるアンマウントを待つとリスナー解除が間に合わないため、明示的に先解除している。
+`router.replace` によるアンマウントを待つとリスナー解除が間に合わないため、明示的に先解除している。`unsubscribe` は `useChatData` フックが返す関数で、内部の `unsubscribeRef.current?.()` を呼ぶ。
 
 ---
 

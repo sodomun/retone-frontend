@@ -171,9 +171,21 @@ src/
 │       ├── Footer          # ボトムナビゲーション（トーク / 設定）
 │       └── LogoutModal     # ログアウト確認モーダル
 │
-└── lib/                    # Firebase 操作・ビジネスロジック
+├── hooks/                  # カスタムフック（useState / useEffect を含むロジック）
+│   ├── useAuth.ts          # 認証状態 + AI設定取得（settings が必要なページ向け）
+│   ├── useRequireAuth.ts   # 認証チェックのみ（settings 不要なページ向け）
+│   ├── useMessages.ts      # メッセージのリアルタイム購読 + markAsRead
+│   ├── useChatData.ts      # チャットドキュメントのリアルタイム購読 + initialReadAtMs 管理
+│   ├── useAiProcessing.ts  # 未読メッセージの AI 処理（副作用のみ、戻り値なし）
+│   ├── useUserProfile.ts   # Firestore ユーザープロフィールの一度きり取得
+│   ├── useFriends.ts       # 友達一覧のリアルタイム購読
+│   └── useChats.ts         # チャット一覧のリアルタイム購読
+│
+└── lib/                    # Firebase 操作・純粋関数（React に依存しない）
     ├── firebase.ts         # Firebase 初期化
-    ├── chat.ts             # チャット関連の関数・型
+    ├── auth.ts             # ログイン・サインアップ（Firebase Auth の薄いラッパー）
+    ├── users.ts            # ユーザープロフィールの取得（getUserProfile / getUserDisplayName）
+    ├── chat.ts             # チャット関連の関数・型（getReadCount / getDisplayText を含む）
     ├── friends.ts          # 友達関連の関数・型（友達削除含む）
     ├── group.ts            # グループ関連の関数（グループ退会）
     ├── settings.ts         # AI設定の取得・更新（settings コレクション）
@@ -181,7 +193,28 @@ src/
 ```
 
 ### 設計の意図
-- `app/` はページのみ。データ取得ロジックは `lib/` に集約することで、画面とロジックを分離している
+
+**3層構造で関心を分離する**
+
+```
+app/（ページ）
+  ↓ フックを呼ぶだけ
+hooks/（useState / useEffect を含むロジック）
+  ↓ lib を呼ぶだけ
+lib/（Firebase 操作・純粋関数）
+```
+
+- `app/` の各 page.tsx はコンポーネントの組み立てと JSX のみ。ビジネスロジックを持たない
+- `hooks/` は React の機能（useState / useEffect）を使う処理をまとめる。Firebase 直呼びは行わず `lib/` 経由にする
+- `lib/` は React に依存しない純粋な関数群。フック以外の場所（server actions など）でも再利用できる
+
+**hooks と lib の使い分け**
+
+| 書く場所 | 基準 | 例 |
+|---|---|---|
+| `lib/` | `useState` / `useEffect` を使わない | Firestore の読み書き、計算関数 |
+| `hooks/` | `useState` / `useEffect` を使う | 購読の開始・停止、状態管理 |
+
 - `components/` はページをまたいで再利用できる単位で分割
 - `common/` は特定のドメインに依存しない汎用コンポーネントを置く
 

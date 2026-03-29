@@ -12,7 +12,7 @@ export default function ChatProfilePage() {
   const { id: chatId } = useParams<{ id: string }>();
   const router = useRouter();
   const { user } = useRequireAuth();
-  const { chat, loading } = useChatData(chatId, user?.uid);
+  const { chat, loading, unsubscribe } = useChatData(chatId, user?.uid);
   const [submitting, setSubmitting] = useState(false);
 
   if (loading || !user || !chat) return <p>読み込み中...</p>;
@@ -26,6 +26,8 @@ export default function ChatProfilePage() {
     const handleLeave = async () => {
       if (!confirm(`「${groupName}」を退会しますか？`)) return;
       setSubmitting(true);
+      // 削除前にリスナーを停止する（削除イベントをリスナーが拾ってpermission-deniedになるのを防ぐ）
+      unsubscribe();
       await leaveGroup(chatId, user.uid);
       router.replace("/talk");
     };
@@ -148,6 +150,8 @@ export default function ChatProfilePage() {
   const handleDeleteFriend = async () => {
     if (!confirm(`「${partnerName}」を友達から削除しますか？\nチャット履歴も削除されます。`)) return;
     setSubmitting(true);
+    // 削除前にリスナーを停止する（削除イベントをリスナーが拾ってpermission-deniedになるのを防ぐ）
+    unsubscribe();
     await deleteFriend(user.uid, partnerUid);
     router.replace("/talk");
   };

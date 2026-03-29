@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loginUser } from "@/lib/auth";
+import { useGuestOnly } from "@/hooks/useGuestOnly";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { loading } = useGuestOnly();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -40,6 +42,8 @@ export default function LoginPage() {
     transition: "border-color 0.15s, box-shadow 0.15s",
     boxSizing: "border-box",
   });
+
+  if (loading) return null;
 
   return (
     <div

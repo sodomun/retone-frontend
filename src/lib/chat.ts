@@ -13,6 +13,7 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { UserSettings } from "@/lib/settings";
 
 export type Message = {
   id: string;
@@ -157,6 +158,68 @@ export async function updateMessageAiText(
   await updateDoc(doc(db, "chats", chatId, "messages", messageId), {
     [`aiTexts.${uid}`]: aiText,
   });
+}
+
+/**
+ * 自分が送信したメッセージの既読人数を返す。
+ * 自分以外のメッセージは 0 を返す。
+ */
+export function getReadCount(
+  msg: Message,
+  userId: string,
+  isGroup: boolean,
+  chat: Chat | null,
+  partnerReadAtMs: number
+): number {
+  if (msg.senderUid !== userId) return 0;
+
+  if (!isGroup) {
+    // 1:1チャット: 相手が既読済みなら1、未読なら0
+    return partnerReadAtMs > 0 &&
+      (msg.createdAt?.getTime() ?? Infinity) <= partnerReadAtMs
+      ? 1
+      : 0;
+  }
+
+  // グループチャット: 自分以外のメンバーのうち既読済みの人数を返す
+  const msgTimeMs = msg.createdAt?.getTime();
+  if (msgTimeMs == null) return 0;
+
+  return (chat?.members ?? [])
+    .filter((uid) => uid !== userId)
+    .filter((uid) => {
+      const readAtMs = chat?.readBy?.[uid]?.toMillis();
+      return readAtMs != null && readAtMs >= msgTimeMs;
+    }).length;
+}
+
+/**
+ * メッセージに表示するテキストを決定する。
+ * null を返した場合はメッセージを非表示にする（未読 & AI処理待ち）。
+ *
+ * 判定フロー:
+ *   1. 自分の発言          → 原文
+ *   2. AI無効              → 原文
+ *   3. AI処理済み          → AIテキスト
+ *   4. 未読 & AI未処理     → null（秘匿のため非表示）
+ *   5. 既読済み & AI未処理 → 原文（既に見ているので見せてOK）
+ */
+export function getDisplayText(
+  msg: Message,
+  userId: string,
+  settings: UserSettings | null,
+  initialReadAtMs: number | null
+): string | null {
+  if (msg.senderUid === userId) return msg.text;
+  if (!settings?.aiEnabled) return msg.text;
+
+  const aiText = msg.aiTexts[userId];
+  if (aiText) return aiText;
+
+  const msgTime = msg.createdAt?.getTime() ?? 0;
+  if (msgTime > (initialReadAtMs ?? 0)) return null;
+
+  return msg.text;
 }
 
 /** メッセージをリアルタイム取得する。unsubscribe関数を返す */

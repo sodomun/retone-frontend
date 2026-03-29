@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { subscribeToChatData, Chat } from "@/lib/chat";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useChatData } from "@/hooks/useChatData";
 import ProfileAvatar from "@/components/user/ProfileAvatar";
 import { deleteFriend } from "@/lib/friends";
 import { leaveGroup } from "@/lib/group";
@@ -12,31 +11,11 @@ import { leaveGroup } from "@/lib/group";
 export default function ChatProfilePage() {
   const { id: chatId } = useParams<{ id: string }>();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [chat, setChat] = useState<Chat | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user } = useRequireAuth();
+  const { chat, loading } = useChatData(chatId, user?.uid);
   const [submitting, setSubmitting] = useState(false);
-  const unsubscribeChatRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
-      if (!u) router.replace("/login");
-      else setUser(u);
-    });
-  }, [router]);
-
-  useEffect(() => {
-    if (!user || !chatId) return;
-    const unsub = subscribeToChatData(chatId, (c) => {
-      setChat(c);
-      setLoading(false);
-    });
-    unsubscribeChatRef.current = unsub;
-    return unsub;
-  }, [user, chatId]);
-
-  if (loading) return <p>読み込み中...</p>;
-  if (!user || !chat) return null;
+  if (loading || !user || !chat) return <p>読み込み中...</p>;
 
   const isGroup = chat.type === "group";
 
@@ -47,7 +26,6 @@ export default function ChatProfilePage() {
     const handleLeave = async () => {
       if (!confirm(`「${groupName}」を退会しますか？`)) return;
       setSubmitting(true);
-      unsubscribeChatRef.current?.();
       await leaveGroup(chatId, user.uid);
       router.replace("/talk");
     };
@@ -170,7 +148,6 @@ export default function ChatProfilePage() {
   const handleDeleteFriend = async () => {
     if (!confirm(`「${partnerName}」を友達から削除しますか？\nチャット履歴も削除されます。`)) return;
     setSubmitting(true);
-    unsubscribeChatRef.current?.();
     await deleteFriend(user.uid, partnerUid);
     router.replace("/talk");
   };

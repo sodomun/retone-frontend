@@ -1,35 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { subscribeToFriends, FriendData } from "@/lib/friends";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useFriends } from "@/hooks/useFriends";
 import ProfileAvatar from "@/components/user/ProfileAvatar";
 
 export default function NewGroupPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [friends, setFriends] = useState<FriendData[]>([]);
+  const { user, loading } = useRequireAuth();
+  const { friends } = useFriends(user?.uid);
   const [selectedUids, setSelectedUids] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        router.replace("/login");
-      } else {
-        setUser(currentUser);
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
-
-  useEffect(() => {
-    if (!user) return;
-    return subscribeToFriends(user.uid, setFriends);
-  }, [user]);
 
   const toggleSelect = (uid: string) => {
     setSelectedUids((prev) => {

@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, Timestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { signupUser } from "@/lib/auth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -22,15 +20,7 @@ export default function SignupPage() {
     setError("");
     setSubmitting(true);
     try {
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
-      const { uid } = credential.user;
-
-      await setDoc(doc(db, "users", uid), {
-        uid,
-        displayName,
-        createdAt: Timestamp.now(),
-      });
-
+      await signupUser(email, password, displayName);
       router.push("/talk");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "サインアップに失敗しました");

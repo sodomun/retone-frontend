@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { getUserProfile } from "@/lib/users";
 import { createGroupChat } from "@/lib/chat";
 import ProfileAvatar from "@/components/user/ProfileAvatar";
 
@@ -16,41 +15,32 @@ type MemberInfo = {
 export default function GroupProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading } = useRequireAuth();
   const [myDisplayName, setMyDisplayName] = useState("");
   const [members, setMembers] = useState<MemberInfo[]>([]);
   const [groupName, setGroupName] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
 
+  // 自分と選択メンバーのdisplayNameをFirestoreから取得する
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        router.replace("/login");
-        setLoading(false);
-        return;
-      }
-      setUser(currentUser);
+    if (!user) return;
+    const memberUids = (searchParams.get("members") ?? "").split(",").filter(Boolean);
 
-      // 自分の displayName を取得
-      const mySnap = await getDoc(doc(db, "users", currentUser.uid));
-      const myName = mySnap.exists() ? (mySnap.data().displayName ?? "") : "";
-      setMyDisplayName(myName);
-
-      // URLパラメータから選択済みメンバーのUIDを取得し displayName を取得
-      const memberUids = (searchParams.get("members") ?? "").split(",").filter(Boolean);
-      const memberInfos = await Promise.all(
-        memberUids.map(async (uid) => {
-          const snap = await getDoc(doc(db, "users", uid));
-          const displayName = snap.exists() ? (snap.data().displayName ?? uid) : uid;
-          return { uid, displayName };
-        })
+    Promise.all([
+      getUserProfile(user.uid),
+      ...memberUids.map((uid) => getUserProfile(uid)),
+    ]).then(([myProfile, ...memberProfiles]) => {
+      setMyDisplayName(myProfile?.displayName ?? "");
+      setMembers(
+        memberProfiles.map((p, i) => ({
+          uid: memberUids[i],
+          displayName: p?.displayName ?? memberUids[i],
+        }))
       );
-      setMembers(memberInfos);
-      setLoading(false);
+      setProfileLoading(false);
     });
-    return () => unsubscribe();
-  }, [router, searchParams]);
+  }, [user, searchParams]);
 
   const handleCreate = async () => {
     if (!user || !groupName.trim()) return;
@@ -64,7 +54,7 @@ export default function GroupProfilePage() {
     router.replace(`/talk/${chatId}`);
   };
 
-  if (loading) return <p>読み込み中...</p>;
+  if (authLoading || profileLoading) return <p>読み込み中...</p>;
   if (!user) return null;
 
   // 表示するメンバー：自分 + 選択した友達

@@ -1,43 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { subscribeToChats, ChatWithId } from "@/lib/chat";
-import { getSettings } from "@/lib/settings";
+import { useAuth } from "@/hooks/useAuth";
+import { useChats } from "@/hooks/useChats";
 import TalkHeader from "@/components/talk/TalkHeader";
 import FriendListItem from "@/components/user/FriendListItem";
 import Footer from "@/components/common/Footer";
 
 export default function TalkPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [chats, setChats] = useState<ChatWithId[]>([]);
-  const [aiEnabled, setAiEnabled] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        router.replace("/login");
-      } else {
-        setUser(currentUser);
-        getSettings(currentUser.uid).then((s) => setAiEnabled(s?.aiEnabled ?? false));
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
-
-  // 自分が参加している全チャットを lastMessageAt 降順で購読
-  useEffect(() => {
-    if (!user) return;
-    return subscribeToChats(user.uid, setChats);
-  }, [user]);
+  const { user, settings, loading } = useAuth();
+  const { chats } = useChats(user?.uid);
 
   if (loading) return <p>読み込み中...</p>;
   if (!user) return null;
+
+  const aiEnabled = settings?.aiEnabled ?? false;
 
   return (
     <div

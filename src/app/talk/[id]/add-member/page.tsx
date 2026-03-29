@@ -1,54 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import {
-  subscribeToChats,
-  subscribeToChatData,
-  addMembersToGroup,
-  getChatId,
-  ChatWithId,
-} from "@/lib/chat";
-import { subscribeToFriends, FriendData } from "@/lib/friends";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useChatData } from "@/hooks/useChatData";
+import { useFriends } from "@/hooks/useFriends";
+import { useChats } from "@/hooks/useChats";
+import { addMembersToGroup, getChatId } from "@/lib/chat";
 import FriendListItem from "@/components/user/FriendListItem";
 
 export default function AddMemberPage() {
   const { id: chatId } = useParams<{ id: string }>();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [groupMembers, setGroupMembers] = useState<string[]>([]);
-  const [friends, setFriends] = useState<FriendData[]>([]);
-  const [chats, setChats] = useState<ChatWithId[]>([]);
+  const { user } = useRequireAuth();
+  const { chat, loading } = useChatData(chatId, user?.uid);
+  const { friends } = useFriends(user?.uid);
+  const { chats } = useChats(user?.uid);
   const [selectedUids, setSelectedUids] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
-      if (!u) router.replace("/login");
-      else setUser(u);
-    });
-  }, [router]);
-
-  useEffect(() => {
-    if (!user || !chatId) return;
-    return subscribeToChatData(chatId, (chat) => {
-      setGroupMembers(chat?.members ?? []);
-      setLoading(false);
-    });
-  }, [user, chatId]);
-
-  useEffect(() => {
-    if (!user) return;
-    return subscribeToFriends(user.uid, setFriends);
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    return subscribeToChats(user.uid, setChats);
-  }, [user]);
 
   const toggleSelect = (uid: string) => {
     setSelectedUids((prev) => {
@@ -71,9 +40,9 @@ export default function AddMemberPage() {
     router.replace(`/talk/${chatId}`);
   };
 
-  if (loading) return <p>読み込み中...</p>;
-  if (!user) return null;
+  if (loading || !user) return <p>読み込み中...</p>;
 
+  const groupMembers = chat?.members ?? [];
   const eligibleFriends = friends
     .filter((f) => !groupMembers.includes(f.uid))
     .map((f) => {

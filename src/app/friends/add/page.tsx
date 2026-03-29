@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { getUserDisplayName } from "@/lib/users";
 import { searchUserByUid, addFriend } from "@/lib/friends";
 import AddFriendItem from "@/components/user/AddFriendItem";
 
@@ -16,20 +14,12 @@ type SearchResult = {
 
 export default function AddFriendPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useRequireAuth();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<SearchResult | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      if (!u) router.replace("/login");
-      else setUser(u);
-    });
-    return () => unsubscribe();
-  }, [router]);
 
   async function handleSearch() {
     if (!query.trim()) return;
@@ -49,13 +39,7 @@ export default function AddFriendPage() {
     if (!user || !result) return;
     if (result.uid === user.uid) return;
     setAdding(true);
-
-    // 自分のdisplayNameをFirestoreから取得
-    const mySnap = await getDoc(doc(db, "users", user.uid));
-    const myDisplayName = mySnap.exists()
-      ? (mySnap.data().displayName as string)
-      : (user.displayName ?? "Unknown");
-
+    const myDisplayName = await getUserDisplayName(user.uid) || user.displayName || "Unknown";
     await addFriend(user.uid, result.uid, result.displayName, myDisplayName);
     setAdding(false);
     router.push("/talk");

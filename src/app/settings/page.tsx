@@ -1,51 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { updateSettings, DEFAULT_SYSTEM_PROMPT } from "@/lib/settings";
 import ProfileAvatar from "@/components/user/ProfileAvatar";
 import Footer from "@/components/common/Footer";
 import LogoutModal from "@/components/common/LogoutModal";
-import { getSettings, updateSettings, DEFAULT_SYSTEM_PROMPT } from "@/lib/settings";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [displayName, setDisplayName] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { user, settings, loading } = useAuth();
+  const profile = useUserProfile(user?.uid);
 
   const [aiEnabled, setAiEnabled] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [aiSaving, setAiSaving] = useState(false);
   const [aiSaved, setAiSaved] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  // settingsが取得されたらローカルの編集状態を初期化する
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        router.replace("/login");
-        setLoading(false);
-        return;
-      }
-      setUser(currentUser);
-
-      const snap = await getDoc(doc(db, "users", currentUser.uid));
-      if (snap.exists()) {
-        setDisplayName(snap.data().displayName ?? "");
-      }
-
-      const settings = await getSettings(currentUser.uid);
-      if (settings) {
-        setAiEnabled(settings.aiEnabled);
-        setSystemPrompt(settings.systemPrompt);
-      }
-
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
+    if (settings) {
+      setAiEnabled(settings.aiEnabled);
+      setSystemPrompt(settings.systemPrompt);
+    }
+  }, [settings]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -63,6 +46,8 @@ export default function SettingsPage() {
 
   if (loading) return <p>読み込み中...</p>;
   if (!user) return null;
+
+  const displayName = profile?.displayName ?? "";
 
   return (
     <>

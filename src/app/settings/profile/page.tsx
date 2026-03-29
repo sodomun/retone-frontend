@@ -1,50 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import ProfileAvatar from "@/components/user/ProfileAvatar";
-
-type ProfileData = {
-  uid: string;
-  displayName: string;
-  createdAt: Date | null;
-};
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useRequireAuth();
+  const profile = useUserProfile(user?.uid);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        router.replace("/login");
-        setLoading(false);
-        return;
-      }
-      setUser(currentUser);
-      // 認証から得たUIDのみ使用。URLパラメータは使わないため他ユーザーのデータを取得不可。
-      // Firestore Security Rules側でも allow read: if request.auth.uid == userId で二重保護可能。
-      const snap = await getDoc(doc(db, "users", currentUser.uid));
-      if (snap.exists()) {
-        const data = snap.data();
-        setProfile({
-          uid: data.uid,
-          displayName: data.displayName ?? "",
-          createdAt: data.createdAt?.toDate() ?? null,
-        });
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [router]);
-
-  if (loading) return <p>読み込み中...</p>;
-  if (!user || !profile) return null;
+  if (loading || !profile) return <p>読み込み中...</p>;
+  if (!user) return null;
 
   return (
     <div

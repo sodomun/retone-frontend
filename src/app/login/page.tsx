@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { loginUser } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,7 +19,7 @@ export default function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await loginUser(email, password);
       router.push("/talk");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");

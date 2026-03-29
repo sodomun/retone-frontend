@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { getUserProfile } from "@/lib/users";
@@ -13,6 +13,14 @@ type MemberInfo = {
 };
 
 export default function GroupProfilePage() {
+  return (
+    <Suspense fallback={<p>読み込み中...</p>}>
+      <GroupProfileContent />
+    </Suspense>
+  );
+}
+
+function GroupProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useRequireAuth();

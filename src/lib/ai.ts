@@ -20,4 +20,4 @@ export async function adjustMessage(
     return null;
   }
 }
-// ダミー
+
